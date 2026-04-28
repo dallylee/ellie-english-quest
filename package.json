@@ -1,0 +1,16 @@
+{
+  "name": "eli-english-quest",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A personalised browser-based A1 English learning game for Eli.",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "test": "node scripts/validate-content.mjs"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0"
+  }
+}
