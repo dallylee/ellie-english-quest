@@ -1,6 +1,7 @@
 export const learnerProfile = {
   learnerName: "Eli",
-  spokenName: "Eli",
+  displayName: "Eli",
+  spokenName: "Ellie",
   age: 10,
   city: "Zagreb",
   country: "Croatia",
@@ -14,6 +15,7 @@ export const learnerProfile = {
   favouriteFoods: ["lasagne", "pizza", "juhica", "cake"],
   pronunciationNotes: {
     Eli: "Eli",
+    Ellie: "ELL-ee",
     Zagreb: "ZAH-greb",
     Bjelovar: "BYEH-lo-var",
     juhica: "YOO-hee-tsa, grandma’s soup"
@@ -27,14 +29,51 @@ export const learnerProfile = {
 
 export const gameConfig = {
   title: "Eli’s English Quest",
-  subtitle: "A tiny English adventure with stars, games, and happy guesses.",
+  subtitle: "A magic English quest with stars, games, and happy guesses.",
   starThresholds: {
     one: 0.45,
     two: 0.7,
     three: 0.9
   },
+  progression: {
+    minimumModes: 3,
+    minimumStars: 8
+  },
   storageKey: "ellie-english-quest-progress-v1"
 };
+
+export const rewardMilestones = [
+  {
+    stars: 10,
+    title: "Magic Egg",
+    icon: "🥚",
+    description: "A little magic starts here."
+  },
+  {
+    stars: 20,
+    title: "Magic Feather",
+    icon: "🪶",
+    description: "Light as a brave word."
+  },
+  {
+    stars: 30,
+    title: "Magic Potion",
+    icon: "🧪",
+    description: "A sip of smart English."
+  },
+  {
+    stars: 40,
+    title: "Magic Wand",
+    icon: "🪄",
+    description: "Tap, say, and shine."
+  },
+  {
+    stars: 50,
+    title: "Crown",
+    icon: "👑",
+    description: "Quest queen energy."
+  }
+];
 
 export const levels = [
   {

@@ -8,9 +8,12 @@ The app is designed as a playful alternative to a voice tutor. It uses short gam
 
 - 8 A1 learning worlds with map progression
 - Quiz, Picture Match, Memory, Listen & Say, and Sentence Builder modes
-- Star rewards, level unlocks, and a trophy room
+- A magical Eli welcome screen using `public/assets/images/eli.png`
+- Star rewards, quest-based level unlocks, milestone collectibles, and a trophy room
+- Bundled MP3 sound effects for welcome, taps, stars, level opens, announcements, and awards
 - Local progress saving via `localStorage`
 - Mobile-first layout with large touch targets
+- Visible Sound and Voice controls
 - Browser-native speech synthesis and optional speech recognition fallback
 - PWA manifest and basic service worker
 - Static-site deployment with no backend required
@@ -51,4 +54,6 @@ Keep future changes child-friendly and phone-first:
 - short questions and gentle feedback
 - Croatian only as support
 - rewards for trying, not only for correctness
+- next worlds unlock after meaningful quest progress, not one quick game
+- visible UI uses `Eli`; browser text-to-speech uses `Ellie`
 - no sensitive personal data

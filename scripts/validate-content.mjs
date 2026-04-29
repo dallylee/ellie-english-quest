@@ -1,8 +1,13 @@
-import { levels } from "../src/data/curriculum.js";
+import fs from "node:fs";
+import path from "node:path";
+
+import { learnerProfile, gameConfig, levels, rewardMilestones } from "../src/data/curriculum.js";
+import { soundAssets } from "../src/lib/sound.js";
 import { createDefaultProgress } from "../src/lib/storage.js";
 
 const errors = [];
 const ids = new Set();
+const rootDir = process.cwd();
 
 for (const level of levels) {
   if (!level.id) errors.push("Level missing id");
@@ -38,6 +43,65 @@ for (const level of levels) {
 }
 
 const progress = createDefaultProgress();
+const expectedMilestones = [
+  [10, "Magic Egg"],
+  [20, "Magic Feather"],
+  [30, "Magic Potion"],
+  [40, "Magic Wand"],
+  [50, "Crown"]
+];
+
+if (!gameConfig.progression || gameConfig.progression.minimumModes < 2 || gameConfig.progression.minimumStars < 1) {
+  errors.push("gameConfig: progression needs a sensible minimum mode and star rule");
+}
+
+if (!Array.isArray(rewardMilestones) || rewardMilestones.length !== expectedMilestones.length) {
+  errors.push("rewardMilestones: expected 5 milestone rewards");
+} else {
+  for (const [index, [stars, title]] of expectedMilestones.entries()) {
+    const reward = rewardMilestones[index];
+    if (!reward || reward.stars !== stars || reward.title !== title || !reward.icon || !reward.description) {
+      errors.push(`rewardMilestones: milestone ${stars} stars must be ${title}`);
+    }
+  }
+}
+
+if (!progress.settings || typeof progress.settings.soundEnabled !== "boolean" || typeof progress.settings.voiceEnabled !== "boolean") {
+  errors.push("default progress missing sound settings");
+}
+
+if (learnerProfile.displayName !== "Eli") {
+  errors.push("learnerProfile.displayName must be Eli for visible UI");
+}
+
+if (learnerProfile.spokenName !== "Ellie") {
+  errors.push("learnerProfile.spokenName must be Ellie for speech synthesis");
+}
+
+const expectedSoundAssets = {
+  welcome: "/assets/sounds/startup-screen-sound.mp3",
+  ui: "/assets/sounds/ui-click.mp3",
+  level: "/assets/sounds/new-level-opened.mp3",
+  award: "/assets/sounds/award-reveal.mp3",
+  announcement: "/assets/sounds/announcement.mp3",
+  star: "/assets/sounds/star-collected.mp3"
+};
+
+for (const [key, url] of Object.entries(expectedSoundAssets)) {
+  if (soundAssets[key] !== url) {
+    errors.push(`soundAssets.${key} must be ${url}`);
+    continue;
+  }
+  const filePath = path.join(rootDir, "public", url.replace(/^\/+/, ""));
+  if (!fs.existsSync(filePath)) {
+    errors.push(`Missing sound asset: ${url}`);
+  }
+}
+
+if (!fs.existsSync(path.join(rootDir, "public", "assets", "images", "eli.png"))) {
+  errors.push("Missing Eli image asset: /assets/images/eli.png");
+}
+
 for (const level of levels) {
   const levelProgress = progress.levelProgress[level.id];
   if (!levelProgress || typeof levelProgress.pictureStars !== "number") {

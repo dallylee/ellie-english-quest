@@ -1,4 +1,45 @@
-import { gameConfig, levels } from "../data/curriculum.js";
+import { gameConfig, levels, rewardMilestones } from "../data/curriculum.js";
+
+const modeStarKeys = ["quizStars", "pictureStars", "memoryStars", "speakStars", "buildStars"];
+
+function getLevelStars(levelProgress) {
+  return modeStarKeys.reduce((sum, key) => sum + Math.max(levelProgress[key] || 0, 0), 0);
+}
+
+function getCompletedModeCount(levelProgress) {
+  return modeStarKeys.filter((key) => Math.max(levelProgress[key] || 0, 0) > 0).length;
+}
+
+function applyProgression(progress) {
+  let totalStars = 0;
+  let previousLevelReady = true;
+  progress.trophies = Array.isArray(progress.trophies) ? progress.trophies : [];
+
+  levels.forEach((level, index) => {
+    const lp = progress.levelProgress[level.id];
+    if (!lp) return;
+
+    const levelStars = getLevelStars(lp);
+    const completedModes = getCompletedModeCount(lp);
+    const questReady = levelStars >= gameConfig.progression.minimumStars
+      && completedModes >= gameConfig.progression.minimumModes;
+
+    lp.unlocked = index === 0 || previousLevelReady;
+    lp.completed = questReady;
+    totalStars += levelStars;
+    previousLevelReady = questReady;
+  });
+
+  progress.totalStars = totalStars;
+
+  for (const reward of rewardMilestones) {
+    if (totalStars >= reward.stars && !progress.trophies.includes(reward.title)) {
+      progress.trophies.push(reward.title);
+    }
+  }
+
+  return progress;
+}
 
 export function createDefaultProgress() {
   const levelProgress = {};
@@ -20,6 +61,10 @@ export function createDefaultProgress() {
     totalStars: 0,
     levelProgress,
     trophies: [],
+    settings: {
+      soundEnabled: true,
+      voiceEnabled: true
+    },
     lastPlayedLevelId: levels[0]?.id || null,
     updatedAt: new Date().toISOString()
   };
@@ -36,6 +81,10 @@ export function loadProgress() {
     const mergedProgress = {
       ...defaults,
       ...parsed,
+      settings: {
+        ...defaults.settings,
+        ...(parsed.settings || {})
+      },
       levelProgress: { ...defaults.levelProgress }
     };
 
@@ -46,7 +95,7 @@ export function loadProgress() {
       };
     }
 
-    return mergedProgress;
+    return applyProgression(mergedProgress);
   } catch {
     return createDefaultProgress();
   }
@@ -65,35 +114,7 @@ export function resetProgress() {
 }
 
 export function recalcAndUnlock(progress) {
-  let totalStars = 0;
-  levels.forEach((level, index) => {
-    const lp = progress.levelProgress[level.id];
-    if (!lp) return;
-
-    const levelStars = Math.max(lp.quizStars || 0, 0)
-      + Math.max(lp.memoryStars || 0, 0)
-      + Math.max(lp.pictureStars || 0, 0)
-      + Math.max(lp.speakStars || 0, 0)
-      + Math.max(lp.buildStars || 0, 0);
-
-    if (levelStars >= 3) lp.completed = true;
-    totalStars += levelStars;
-
-    const next = levels[index + 1];
-    if (next && levelStars >= 2) {
-      progress.levelProgress[next.id].unlocked = true;
-    }
-  });
-  progress.totalStars = totalStars;
-
-  if (totalStars >= 12 && !progress.trophies.includes("First dozen stars")) {
-    progress.trophies.push("First dozen stars");
-  }
-  if (totalStars >= 24 && !progress.trophies.includes("Brave English Explorer")) {
-    progress.trophies.push("Brave English Explorer");
-  }
-
-  return saveProgress(progress);
+  return saveProgress(applyProgression(progress));
 }
 
 export function starsFromScore(correct, total) {

@@ -1,12 +1,24 @@
 # Asset Guide
 
-The starter app does not require downloaded images or sounds.
+The app ships as a static site with local image and sound assets.
 
 ## Current approach
 
-- Visuals: CSS, emoji, SVG icon
-- Sounds: generated with the Web Audio API
+- Visuals: Eli PNG, CSS, emoji, SVG icon
+- Sounds: bundled MP3 files, with generated Web Audio as a fallback
 - Voice: browser SpeechSynthesis
+
+## Current local assets
+
+```text
+public/assets/images/eli.png
+public/assets/sounds/startup-screen-sound.mp3
+public/assets/sounds/ui-click.mp3
+public/assets/sounds/new-level-opened.mp3
+public/assets/sounds/award-reveal.mp3
+public/assets/sounds/announcement.mp3
+public/assets/sounds/star-collected.mp3
+```
 
 ## Optional user-provided assets
 
