@@ -70,6 +70,10 @@ if (!progress.settings || typeof progress.settings.soundEnabled !== "boolean" ||
   errors.push("default progress missing sound settings");
 }
 
+if (progress.settings?.soundEnabled !== true || progress.settings?.voiceEnabled !== false) {
+  errors.push("default progress should start with sound on and voice off");
+}
+
 if (learnerProfile.displayName !== "Eli") {
   errors.push("learnerProfile.displayName must be Eli for visible UI");
 }
@@ -105,6 +109,11 @@ if (!fs.existsSync(path.join(rootDir, "public", "assets", "images", "eli.png")))
 
 if (!fs.existsSync(path.join(rootDir, "public", "assets", "images", "eli_.icon"))) {
   errors.push("Missing Eli browser icon asset: /assets/images/eli_.icon");
+}
+
+const serviceWorker = fs.readFileSync(path.join(rootDir, "public", "sw.js"), "utf8");
+if (!serviceWorker.includes("eli-english-quest-v3") || !serviceWorker.includes("networkFirstHtml")) {
+  errors.push("Service worker must use the v3 network-first update strategy");
 }
 
 for (const level of levels) {

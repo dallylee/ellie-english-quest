@@ -15,6 +15,7 @@ The app is designed as a playful alternative to a voice tutor. It uses short gam
 - Local progress saving via `localStorage`
 - Mobile-first layout with large touch targets
 - Visible Sound and Voice controls
+- Sound starts on by default; Voice starts off until a voice game needs it
 - Browser-native speech synthesis and optional speech recognition fallback
 - PWA manifest and basic service worker
 - Static-site deployment with no backend required

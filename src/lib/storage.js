@@ -63,7 +63,7 @@ export function createDefaultProgress() {
     trophies: [],
     settings: {
       soundEnabled: true,
-      voiceEnabled: true
+      voiceEnabled: false
     },
     lastPlayedLevelId: levels[0]?.id || null,
     updatedAt: new Date().toISOString()

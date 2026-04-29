@@ -20,6 +20,8 @@ Tested with local Vite dev server at `http://localhost:5173/` in headless Micros
 - Full-screen welcome screen loaded with Eli's image from `public/assets/images/eli.png`.
 - Browser favicon link points to `public/assets/images/eli_.icon`.
 - Visible Sound and Voice controls appeared on the welcome screen and app header.
+- Fresh saves start with Sound on and Voice off; Listen & Say turns Voice on when opened.
+- A local browser simulation seeded an old `eli-english-quest-v2` cache before loading the app; the new worker replaced it with `eli-english-quest-v3` and the start screen rendered normally.
 - Visible UI text used Eli and did not show Ellie.
 - Speech synthesis probe captured `Hi Ellie. Choose a little world.` with softer settings: rate about `0.76`, pitch about `1.18`, and volume about `0.72`.
 - Fresh Room Castle map card used the pulsing active-quest state.
@@ -58,3 +60,4 @@ Tested with local Vite dev server at `http://localhost:5173/` in headless Micros
 
 - Real microphone speech recognition, because support depends on browser/device permissions.
 - Installation as a PWA on a physical phone.
+- A physical phone with the previously deployed stale service worker; local browser simulation covered the old-cache recovery path.

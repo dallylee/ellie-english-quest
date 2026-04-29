@@ -53,6 +53,13 @@
 - The next active unlocked quest card now gently pulses on the map, and 3-star games are styled as soft-gray `Done` cards while remaining replayable.
 - Wired `public/assets/images/eli_.icon` into the browser favicon and PWA manifest icon.
 
+## April 29, 2026 stale-cache recovery pass
+
+- Reworked the service worker to use a new `eli-english-quest-v3` cache and network-first loading for HTML, scripts, styles, and worker files.
+- The new worker activates immediately, claims open pages, deletes older app caches, and stops serving cached HTML as the first choice.
+- Service worker registration now bypasses the browser HTTP cache for update checks and reloads once when an already-controlled page gets a new controller.
+- New/default progress now starts with Sound on and Voice off. Existing saved settings are still merged and preserved; Listen & Say turns Voice on automatically when the mode needs it.
+
 ## Known limitations
 
 - Speech recognition depends on browser support and remains optional.
