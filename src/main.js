@@ -223,11 +223,6 @@ function renderHome() {
         <p class="lead">Play games. Learn words. Win magic rewards.</p>
         <button class="start-spell" id="startBtn">START</button>
         <button class="welcome-link" id="trophyBtn">Trophy Room</button>
-        <div class="welcome-words" aria-label="Friendly words">
-          <span>subject = predmet</span>
-          <span>blanket = dekica</span>
-          <span>juhica = soup</span>
-        </div>
       </main>
     </div>
   `;
