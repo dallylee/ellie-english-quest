@@ -1,5 +1,5 @@
 import "./styles.css";
-import { learnerProfile, gameConfig, levels, bonusIdeas, rewardMilestones } from "./data/curriculum.js";
+import { learnerProfile, gameConfig, levels, rewardMilestones } from "./data/curriculum.js";
 import { speak, getSpeechRecognition, normaliseSpeech, stopSpeaking } from "./lib/speech.js";
 import { playSound } from "./lib/sound.js";
 import { loadProgress, saveProgress, resetProgress, recalcAndUnlock, starsFromScore } from "./lib/storage.js";
@@ -7,6 +7,7 @@ import { loadProgress, saveProgress, resetProgress, recalcAndUnlock, starsFromSc
 const app = document.getElementById("app");
 const ELI_IMAGE = "/assets/images/eli.png";
 const modeStarKeys = ["quizStars", "pictureStars", "memoryStars", "speakStars", "buildStars"];
+const CORRECT_ADVANCE_DELAY = 1150;
 
 let progress = loadProgress();
 let ui = {
@@ -16,6 +17,7 @@ let ui = {
   quizIndex: 0,
   quizCorrect: 0,
   quizFeedback: null,
+  quizReadStatus: null,
   pictureIndex: 0,
   pictureCorrect: 0,
   pictureFeedback: null,
@@ -24,9 +26,11 @@ let ui = {
   memoryMatched: [],
   speakIndex: 0,
   speechResult: null,
+  voiceNotice: null,
   buildIndex: 0,
   buildChosen: [],
-  buildFeedback: null
+  buildFeedback: null,
+  levelBurst: null
 };
 
 function getLevel() {
@@ -67,7 +71,9 @@ function speechNameText(text) {
 }
 
 function speakText(text, options) {
-  if (progress.settings?.voiceEnabled) speak(speechNameText(text), options);
+  if (!progress.settings?.voiceEnabled) return false;
+  if (!("speechSynthesis" in window)) return false;
+  return speak(speechNameText(text), options);
 }
 
 app.addEventListener("click", (event) => {
@@ -91,6 +97,18 @@ function soundControls() {
   `;
 }
 
+function magicDecor() {
+  return `
+    <div class="ambient-magic" aria-hidden="true">
+      <span>✦</span>
+      <span>✧</span>
+      <span>🌸</span>
+      <span>🦋</span>
+      <span>✦</span>
+    </div>
+  `;
+}
+
 function feedbackHtml(feedback) {
   if (!feedback) return "";
   const tone = feedback.tone || "learn";
@@ -107,9 +125,19 @@ function nextButtonHtml(id, label = "Next") {
   return `<button class="primary next-action" id="${id}">${label}</button>`;
 }
 
+function answerLine(answer) {
+  const text = String(answer);
+  return /[.!?]$/.test(text) ? `Answer: ${text}` : `Answer: ${text}.`;
+}
+
+function autoAdvance(callback, delay = CORRECT_ADVANCE_DELAY) {
+  window.setTimeout(callback, delay);
+}
+
 function page(title, body) {
   app.innerHTML = `
     <div class="shell">
+      ${magicDecor()}
       <header class="topbar">
         <button class="brand" data-action="home" aria-label="Go home">
           <span class="brand-icon">✨</span>
@@ -148,8 +176,15 @@ function bindGlobalActions() {
         voiceEnabled: progress.settings?.voiceEnabled !== false,
         ...(progress.settings || {})
       };
-      progress.settings[setting] = !progress.settings[setting];
-      if (setting === "voiceEnabled" && !progress.settings.voiceEnabled) stopSpeaking();
+      const nextValue = !progress.settings[setting];
+      if (setting === "voiceEnabled" && !nextValue && ui.screen === "speak") {
+        progress.settings.voiceEnabled = true;
+        ui.voiceNotice = "Voice stays on for this game.";
+      } else {
+        progress.settings[setting] = nextValue;
+        if (setting === "voiceEnabled" && !nextValue) stopSpeaking();
+        if (setting === "voiceEnabled") ui.voiceNotice = null;
+      }
       progress = saveProgress(progress);
       render();
     });
@@ -171,6 +206,7 @@ function render() {
 function renderHome() {
   app.innerHTML = `
     <div class="welcome-screen">
+      ${magicDecor()}
       <div class="welcome-sparkles" aria-hidden="true">
         <span>✦</span><span>✧</span><span>✦</span><span>✧</span>
       </div>
@@ -210,14 +246,19 @@ function renderHome() {
 }
 
 function renderMap() {
+  const activeQuestId = levels.find((level) => {
+    const lp = levelProgress(level.id);
+    return lp.unlocked && !lp.completed;
+  })?.id;
   const cards = levels.map((level) => {
     const lp = levelProgress(level.id);
     const locked = !lp.unlocked;
+    const activeQuest = !locked && level.id === activeQuestId;
     const total = getLevelStars(lp);
     const completedModes = getCompletedModeCount(lp);
     const questReady = getQuestReady(lp);
     return `
-      <button class="level-node ${locked ? "locked" : ""}" data-level="${level.id}" ${locked ? "disabled" : ""}>
+      <button class="level-node ${locked ? "locked" : ""} ${activeQuest ? "active-quest" : ""}" data-level="${level.id}" ${locked ? "disabled" : ""}>
         <span class="level-order">${level.order}</span>
         <span class="level-icon">${locked ? "🔒" : level.icon}</span>
         <strong>${level.title}</strong>
@@ -237,13 +278,6 @@ function renderMap() {
       </div>
     </section>
     <section class="map-grid">${cards}</section>
-    <section class="card">
-      <h2>Bonus ideas</h2>
-      <p class="muted">Codex can later turn these into full unlockable worlds.</p>
-      <ul class="bonus-list">
-        ${bonusIdeas.map((b) => `<li><strong>${b.title}</strong> unlocks at ${b.unlockStars} stars: ${b.idea}</li>`).join("")}
-      </ul>
-    </section>
   `);
 
   document.querySelectorAll("[data-level]").forEach((btn) => {
@@ -265,8 +299,15 @@ function renderLevel() {
   const levelStars = getLevelStars(lp);
   const completedModes = getCompletedModeCount(lp);
   const questReady = getQuestReady(lp);
+  const burst = ui.levelBurst?.levelId === level.id ? ui.levelBurst : null;
   page(`${level.icon} ${level.title}`, `
     <section class="card level-intro">
+      ${burst ? `
+        <div class="level-burst" aria-hidden="true">
+          <span>✦</span><span>✨</span><span>🌸</span><span>✧</span><span>✨</span>
+        </div>
+        <p class="return-note">${stars(burst.stars)} saved!</p>
+      ` : ""}
       <p class="eyebrow">${level.topic}</p>
       <h2>${level.microTarget}</h2>
       <p>${level.personalHook}</p>
@@ -276,11 +317,11 @@ function renderLevel() {
         <strong>${questReady ? "Next world is open." : "Goal: 8 stars + 3 games."}</strong>
       </div>
       <div class="mode-grid">
-        <button class="mode-card ${lp.quizStars ? "done" : ""}" data-mode="quiz">❓<strong>Quiz</strong><span>${stars(lp.quizStars)}</span></button>
-        <button class="mode-card ${lp.pictureStars ? "done" : ""}" data-mode="picture">🖼️<strong>Picture Match</strong><span>${stars(lp.pictureStars)}</span></button>
-        <button class="mode-card ${lp.memoryStars ? "done" : ""}" data-mode="memory">🧠<strong>Memory</strong><span>${stars(lp.memoryStars)}</span></button>
-        <button class="mode-card ${lp.speakStars ? "done" : ""}" data-mode="speak">🎙️<strong>Listen & Say</strong><span>${stars(lp.speakStars)}</span></button>
-        <button class="mode-card ${lp.buildStars ? "done" : ""}" data-mode="build">🧩<strong>Build Sentence</strong><span>${stars(lp.buildStars)}</span></button>
+        <button class="mode-card ${lp.quizStars ? "done" : ""} ${lp.quizStars >= 3 ? "mastered" : ""}" data-mode="quiz">❓<strong>Quiz</strong><span>${stars(lp.quizStars)}</span></button>
+        <button class="mode-card ${lp.pictureStars ? "done" : ""} ${lp.pictureStars >= 3 ? "mastered" : ""}" data-mode="picture">🖼️<strong>Picture Match</strong><span>${stars(lp.pictureStars)}</span></button>
+        <button class="mode-card ${lp.memoryStars ? "done" : ""} ${lp.memoryStars >= 3 ? "mastered" : ""}" data-mode="memory">🧠<strong>Memory</strong><span>${stars(lp.memoryStars)}</span></button>
+        <button class="mode-card ${lp.speakStars ? "done" : ""} ${lp.speakStars >= 3 ? "mastered" : ""}" data-mode="speak">🎙️<strong>Listen & Say</strong><span>${stars(lp.speakStars)}</span></button>
+        <button class="mode-card ${lp.buildStars ? "done" : ""} ${lp.buildStars >= 3 ? "mastered" : ""}" data-mode="build">🧩<strong>Build Sentence</strong><span>${stars(lp.buildStars)}</span></button>
       </div>
       <button class="secondary" id="backToMap">Back to map</button>
     </section>
@@ -293,6 +334,31 @@ function renderLevel() {
     ui.screen = "map";
     render();
   });
+
+  if (burst) {
+    const burstId = burst.id;
+    window.setTimeout(() => {
+      if (ui.levelBurst?.id === burstId) {
+        ui.levelBurst = null;
+        render();
+      }
+    }, 2200);
+  }
+}
+
+function ensureVoiceForMode(mode) {
+  ui.voiceNotice = null;
+  if (mode !== "speak") return;
+
+  if (progress.settings?.voiceEnabled === false) {
+    progress.settings = {
+      soundEnabled: progress.settings?.soundEnabled !== false,
+      ...(progress.settings || {}),
+      voiceEnabled: true
+    };
+    progress = saveProgress(progress);
+    ui.voiceNotice = "Voice is on for this game.";
+  }
 }
 
 function startMode(mode) {
@@ -300,15 +366,19 @@ function startMode(mode) {
   ui.quizIndex = 0;
   ui.quizCorrect = 0;
   ui.quizFeedback = null;
+  ui.quizReadStatus = null;
   ui.pictureIndex = 0;
   ui.pictureCorrect = 0;
   ui.pictureFeedback = null;
   ui.speakIndex = 0;
   ui.speechResult = null;
+  ui.voiceNotice = null;
   ui.buildIndex = 0;
   ui.buildChosen = [];
   ui.buildFeedback = null;
+  ui.levelBurst = null;
 
+  ensureVoiceForMode(mode);
   if (mode === "memory") setupMemory();
 
   ui.screen = mode;
@@ -328,16 +398,26 @@ function renderQuiz() {
         ${q.options.map((opt) => `<button class="answer-btn" data-answer="${escapeAttr(opt)}" ${ui.quizFeedback ? "disabled" : ""}>${opt}</button>`).join("")}
       </div>
       ${feedbackHtml(ui.quizFeedback)}
-      ${ui.quizFeedback ? nextButtonHtml("quizNext") : ""}
+      ${ui.quizFeedback?.needsContinue ? nextButtonHtml("quizNext") : ""}
       <button class="secondary" id="readQuestion">Read question</button>
+      ${ui.quizReadStatus ? `<p class="read-status">${ui.quizReadStatus}</p>` : ""}
     </section>
   `);
 
-  document.getElementById("readQuestion").addEventListener("click", () => speakText(q.prompt));
-  if (ui.quizFeedback) {
+  document.getElementById("readQuestion").addEventListener("click", () => {
+    const didSpeak = speakText(q.prompt);
+    ui.quizReadStatus = didSpeak
+      ? "Reading..."
+      : progress.settings?.voiceEnabled
+        ? "Voice is not available here."
+        : "Turn Voice on to read.";
+    render();
+  });
+  if (ui.quizFeedback?.needsContinue) {
     document.getElementById("quizNext").addEventListener("click", () => {
       ui.quizIndex += 1;
       ui.quizFeedback = null;
+      ui.quizReadStatus = null;
       render();
     });
   }
@@ -355,13 +435,22 @@ function renderQuiz() {
           text: q.explain
         };
         speakText(`Nice. ${q.explain}`);
+        const answeredIndex = ui.quizIndex;
+        autoAdvance(() => {
+          if (ui.screen !== "quiz" || ui.quizIndex !== answeredIndex) return;
+          ui.quizIndex += 1;
+          ui.quizFeedback = null;
+          ui.quizReadStatus = null;
+          render();
+        });
       } else {
         playEffect("wrong");
         ui.quizFeedback = {
           tone: "learn",
           title: "Good try.",
-          text: `Answer: ${q.correct}.`,
-          cue: q.explain
+          text: answerLine(q.correct),
+          cue: q.explain,
+          needsContinue: true
         };
         speakText(`Good try. The answer is ${q.correct}.`);
       }
@@ -386,11 +475,11 @@ function renderPicture() {
         ${options.map((opt) => `<button class="answer-btn picture-answer" data-picture-answer="${escapeAttr(opt)}" ${ui.pictureFeedback ? "disabled" : ""}>${opt}</button>`).join("")}
       </div>
       ${feedbackHtml(ui.pictureFeedback)}
-      ${ui.pictureFeedback ? nextButtonHtml("pictureNext") : ""}
+      ${ui.pictureFeedback?.needsContinue ? nextButtonHtml("pictureNext") : ""}
     </section>
   `);
 
-  if (ui.pictureFeedback) {
+  if (ui.pictureFeedback?.needsContinue) {
     document.getElementById("pictureNext").addEventListener("click", () => {
       ui.pictureIndex += 1;
       ui.pictureFeedback = null;
@@ -412,12 +501,20 @@ function renderPicture() {
         };
         playEffect("correct");
         speakText(`Nice. ${item.word}.`);
+        const answeredIndex = ui.pictureIndex;
+        autoAdvance(() => {
+          if (ui.screen !== "picture" || ui.pictureIndex !== answeredIndex) return;
+          ui.pictureIndex += 1;
+          ui.pictureFeedback = null;
+          render();
+        });
       } else {
         ui.pictureFeedback = {
           tone: "learn",
           title: "Good try.",
-          text: `Answer: ${item.word}.`,
-          cue: `${item.word} = ${item.support}`
+          text: answerLine(item.word),
+          cue: `${item.word} = ${item.support}`,
+          needsContinue: true
         };
         playEffect("wrong");
         speakText(`Good try. It is ${item.word}.`);
@@ -473,7 +570,6 @@ function flipCard(cardId) {
   if (ui.memoryOpen.length >= 2) return;
 
   ui.memoryOpen.push(cardId);
-  playEffect("star");
 
   if (ui.memoryOpen.length === 2) {
     const [aId, bId] = ui.memoryOpen;
@@ -483,7 +579,6 @@ function flipCard(cardId) {
       ui.memoryMatched.push(aId, bId);
       ui.memoryOpen = [];
       speakText(`Good match. ${a.label}.`);
-      playEffect("correct");
     } else {
       setTimeout(() => {
         ui.memoryOpen = [];
@@ -505,6 +600,7 @@ function renderSpeak() {
       <p class="progress-line">Sentence ${ui.speakIndex + 1} of ${level.speakPrompts.length}</p>
       <h2>Say this:</h2>
       <div class="say-box">${prompt.say}</div>
+      ${ui.voiceNotice ? `<p class="voice-notice">${ui.voiceNotice}</p>` : ""}
       <div class="hero-actions">
         <button class="primary" id="listenBtn">Listen</button>
         <button class="primary" id="speakBtn" ${ui.speechResult?.tone === "listen" ? "disabled" : ""}>${hasRecognition ? "I will say it" : "I said it"}</button>
@@ -566,7 +662,7 @@ function renderSpeak() {
           render();
         }, 1000);
       } else {
-        playEffect("star");
+        playEffect("wrong");
         ui.speechResult = {
           tone: "learn",
           title: "Good try.",
@@ -579,7 +675,7 @@ function renderSpeak() {
     };
 
     recognition.onerror = () => {
-      playEffect("star");
+      playEffect("wrong");
       ui.speechResult = {
         tone: "learn",
         title: "Good try.",
@@ -593,7 +689,7 @@ function renderSpeak() {
     try {
       recognition.start();
     } catch {
-      playEffect("star");
+      playEffect("wrong");
       ui.speechResult = {
         tone: "learn",
         title: "Good try.",
@@ -687,10 +783,6 @@ function finishMode(mode, correct, total) {
   lp.attempts = (lp.attempts || 0) + 1;
   progress.levelProgress[level.id] = lp;
   progress = recalcAndUnlock(progress);
-  const updatedLevelProgress = levelProgress(level.id);
-  const levelStars = getLevelStars(updatedLevelProgress);
-  const completedModes = getCompletedModeCount(updatedLevelProgress);
-  const questReady = getQuestReady(updatedLevelProgress);
   const nextUnlockedNow = nextLevel ? Boolean(levelProgress(nextLevel.id).unlocked) && !nextWasUnlocked : false;
   const newRewards = progress.trophies.filter((item) => !trophiesBefore.has(item));
 
@@ -704,36 +796,15 @@ function finishMode(mode, correct, total) {
   if (newRewards.length || nextUnlockedNow) {
     setTimeout(() => playEffect("announcement"), 180);
   }
-  page("Stars collected!", `
-    <section class="game-card celebration">
-      <div class="reward-burst" aria-hidden="true">✦ ✨ ✦</div>
-      <div class="big-stars">${stars(earned)}</div>
-      <h2>${correct} out of ${total}</h2>
-      <p>${earned >= 2 ? `Amazing work, ${learnerProfile.displayName}.` : `Good try, ${learnerProfile.displayName}. Guessing helps you learn.`}</p>
-      <div class="quest-progress celebration-progress">
-        <span>${starCount(levelStars)}</span>
-        <span>${completedModes}/5 games</span>
-        <strong>${questReady ? "Next world is open!" : "Play 3 games and win 8 stars."}</strong>
-      </div>
-      <div class="hero-actions">
-        <button class="primary" id="againBtn">Play again</button>
-        <button class="secondary" id="levelBtn">Back to level</button>
-        <button class="secondary" id="mapBtn">Map</button>
-      </div>
-    </section>
-  `);
 
   speakText(`You collected ${earned} stars. Great work ${learnerProfile.spokenName}.`);
-
-  document.getElementById("againBtn").addEventListener("click", () => startMode(mode));
-  document.getElementById("levelBtn").addEventListener("click", () => {
-    ui.screen = "level";
-    render();
-  });
-  document.getElementById("mapBtn").addEventListener("click", () => {
-    ui.screen = "map";
-    render();
-  });
+  ui.levelBurst = {
+    id: `${level.id}-${Date.now()}`,
+    levelId: level.id,
+    stars: earned
+  };
+  ui.screen = "level";
+  render();
 }
 
 function renderTrophies() {

@@ -37,6 +37,22 @@
 - Added a speech text guard so any spoken string containing visible `Eli` is converted to `Ellie` before browser text-to-speech.
 - Expanded validation to check the Eli image, safe MP3 asset paths, display/spoken names, and sound settings.
 
+## April 29, 2026 answer flow pass
+
+- Correct Quiz and Picture Match answers now show brief positive feedback and auto-advance after the sound moment.
+- Wrong Quiz and Picture Match answers still stop with the correct answer, a learning cue, and an explicit `Next`.
+- Added the local `wrong-answer.mp3` effect for wrong answers and unclear Listen & Say attempts.
+- Kept `Read question` on Quiz and made it give visible status: it reads with speech synthesis when available, or says why it cannot read.
+- Mode completion now returns straight to the current level menu after saving progress instead of showing replay/map buttons.
+- Memory cards now rely on the normal tap sound only, avoiding stacked sparkle/match effects during card play.
+- Lowered MP3 and generated fallback effect volume to about 40%.
+- Added softer browser speech preferences, with reliable local English female/natural voices preferred when the device provides them.
+- Kept speech utterances alive while the browser speaks and retry without a selected voice if the chosen voice does not start, so the `Listen` button is less likely to fail silently.
+- Listen & Say now automatically keeps the Voice toggle on while that game is active, because the mode depends on hearing the prompt.
+- Added lightweight ambient sparkles/flowers/butterfly details and a short level-complete burst when returning to the level menu.
+- The next active unlocked quest card now gently pulses on the map, and 3-star games are styled as soft-gray `Done` cards while remaining replayable.
+- Wired `public/assets/images/eli_.icon` into the browser favicon and PWA manifest icon.
+
 ## Known limitations
 
 - Speech recognition depends on browser support and remains optional.

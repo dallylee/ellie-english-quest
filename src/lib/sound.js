@@ -4,7 +4,8 @@ export const soundAssets = {
   level: "/assets/sounds/new-level-opened.mp3",
   award: "/assets/sounds/award-reveal.mp3",
   announcement: "/assets/sounds/announcement.mp3",
-  star: "/assets/sounds/star-collected.mp3"
+  star: "/assets/sounds/star-collected.mp3",
+  wrong: "/assets/sounds/wrong-answer.mp3"
 };
 
 const effectAssets = {
@@ -13,13 +14,15 @@ const effectAssets = {
   ui: "ui",
   click: "ui",
   correct: "star",
-  wrong: "ui",
+  wrong: "wrong",
   star: "star",
   level: "level",
   unlock: "level",
   award: "award",
   announcement: "announcement"
 };
+
+const DEFAULT_VOLUME = 0.4;
 
 let audioUnlocked = false;
 let generatedAudioContext = null;
@@ -69,7 +72,7 @@ function playMp3(assetKey) {
   try {
     const audio = new Audio(src);
     audio.preload = "auto";
-    audio.volume = assetKey === "ui" ? 0.35 : 0.58;
+    audio.volume = DEFAULT_VOLUME;
     const playPromise = audio.play();
     if (playPromise && typeof playPromise.catch === "function") {
       playPromise.catch(() => {});
@@ -104,7 +107,7 @@ function playGeneratedSound(type) {
       osc.type = "sine";
       osc.frequency.setValueAtTime(freq, now + i * 0.08);
       gain.gain.setValueAtTime(0.0001, now + i * 0.08);
-      gain.gain.exponentialRampToValueAtTime(0.07, now + i * 0.08 + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.04, now + i * 0.08 + 0.02);
       gain.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.08 + 0.16);
       osc.connect(gain);
       gain.connect(ctx.destination);

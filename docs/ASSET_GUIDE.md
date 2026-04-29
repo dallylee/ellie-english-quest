@@ -4,7 +4,8 @@ The app ships as a static site with local image and sound assets.
 
 ## Current approach
 
-- Visuals: Eli PNG, CSS, emoji, SVG icon
+- Visuals: Eli PNG, CSS, and emoji
+- Browser icon: Eli ICO file
 - Sounds: bundled MP3 files, with generated Web Audio as a fallback
 - Voice: browser SpeechSynthesis
 
@@ -12,12 +13,14 @@ The app ships as a static site with local image and sound assets.
 
 ```text
 public/assets/images/eli.png
+public/assets/images/eli_.icon
 public/assets/sounds/startup-screen-sound.mp3
 public/assets/sounds/ui-click.mp3
 public/assets/sounds/new-level-opened.mp3
 public/assets/sounds/award-reveal.mp3
 public/assets/sounds/announcement.mp3
 public/assets/sounds/star-collected.mp3
+public/assets/sounds/wrong-answer.mp3
 ```
 
 ## Optional user-provided assets

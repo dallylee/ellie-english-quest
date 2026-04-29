@@ -84,7 +84,8 @@ const expectedSoundAssets = {
   level: "/assets/sounds/new-level-opened.mp3",
   award: "/assets/sounds/award-reveal.mp3",
   announcement: "/assets/sounds/announcement.mp3",
-  star: "/assets/sounds/star-collected.mp3"
+  star: "/assets/sounds/star-collected.mp3",
+  wrong: "/assets/sounds/wrong-answer.mp3"
 };
 
 for (const [key, url] of Object.entries(expectedSoundAssets)) {
@@ -100,6 +101,10 @@ for (const [key, url] of Object.entries(expectedSoundAssets)) {
 
 if (!fs.existsSync(path.join(rootDir, "public", "assets", "images", "eli.png"))) {
   errors.push("Missing Eli image asset: /assets/images/eli.png");
+}
+
+if (!fs.existsSync(path.join(rootDir, "public", "assets", "images", "eli_.icon"))) {
+  errors.push("Missing Eli browser icon asset: /assets/images/eli_.icon");
 }
 
 for (const level of levels) {
