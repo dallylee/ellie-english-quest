@@ -60,6 +60,13 @@
 - Service worker registration now bypasses the browser HTTP cache for update checks and reloads once when an already-controlled page gets a new controller.
 - New/default progress now starts with Sound on and Voice off. Existing saved settings are still merged and preserved; Listen & Say turns Voice on automatically when the mode needs it.
 
+## April 29, 2026 reward audio pass
+
+- Added `correct answer.mp3` for correct-answer feedback so the star sound is reserved for final star collection/accounting.
+- Added `magic reward unlock.mp3` for milestone reward unlocks, both when a new reward is earned after star accounting and the first time the Trophy Room is entered after that unlock.
+- Added `pendingRewardReveals` to local progress as a backward-compatible field so Trophy Room reward reveal sound/confetti plays once, then clears.
+- Made unlocked milestone reward cards brighter, bouncier, and higher contrast so Magic Egg and later rewards feel collectible instead of pale.
+
 ## Known limitations
 
 - Speech recognition depends on browser support and remains optional.

@@ -11,7 +11,7 @@ The app is designed as a playful alternative to a voice tutor. It uses short gam
 - A magical Eli welcome screen using `public/assets/images/eli.png`
 - Eli browser icon using `public/assets/images/eli_.icon`
 - Star rewards, quest-based level unlocks, milestone collectibles, and a trophy room
-- Bundled MP3 sound effects for welcome, taps, stars, wrong answers, level opens, announcements, and awards
+- Bundled MP3 sound effects for welcome, taps, correct answers, wrong answers, stars, level opens, announcements, and magic reward unlocks
 - Local progress saving via `localStorage`
 - Mobile-first layout with large touch targets
 - Visible Sound and Voice controls

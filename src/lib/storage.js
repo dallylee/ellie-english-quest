@@ -14,6 +14,9 @@ function applyProgression(progress) {
   let totalStars = 0;
   let previousLevelReady = true;
   progress.trophies = Array.isArray(progress.trophies) ? progress.trophies : [];
+  progress.pendingRewardReveals = Array.isArray(progress.pendingRewardReveals)
+    ? progress.pendingRewardReveals
+    : [];
 
   levels.forEach((level, index) => {
     const lp = progress.levelProgress[level.id];
@@ -35,6 +38,9 @@ function applyProgression(progress) {
   for (const reward of rewardMilestones) {
     if (totalStars >= reward.stars && !progress.trophies.includes(reward.title)) {
       progress.trophies.push(reward.title);
+      if (!progress.pendingRewardReveals.includes(reward.title)) {
+        progress.pendingRewardReveals.push(reward.title);
+      }
     }
   }
 
@@ -61,6 +67,7 @@ export function createDefaultProgress() {
     totalStars: 0,
     levelProgress,
     trophies: [],
+    pendingRewardReveals: [],
     settings: {
       soundEnabled: true,
       voiceEnabled: false

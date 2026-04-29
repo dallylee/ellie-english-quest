@@ -17,6 +17,8 @@ public/assets/images/eli_.icon
 public/assets/sounds/startup-screen-sound.mp3
 public/assets/sounds/ui-click.mp3
 public/assets/sounds/new-level-opened.mp3
+public/assets/sounds/correct answer.mp3
+public/assets/sounds/magic reward unlock.mp3
 public/assets/sounds/award-reveal.mp3
 public/assets/sounds/announcement.mp3
 public/assets/sounds/star-collected.mp3

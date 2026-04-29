@@ -74,6 +74,10 @@ if (progress.settings?.soundEnabled !== true || progress.settings?.voiceEnabled 
   errors.push("default progress should start with sound on and voice off");
 }
 
+if (!Array.isArray(progress.pendingRewardReveals)) {
+  errors.push("default progress missing pendingRewardReveals array");
+}
+
 if (learnerProfile.displayName !== "Eli") {
   errors.push("learnerProfile.displayName must be Eli for visible UI");
 }
@@ -87,6 +91,8 @@ const expectedSoundAssets = {
   ui: "/assets/sounds/ui-click.mp3",
   level: "/assets/sounds/new-level-opened.mp3",
   award: "/assets/sounds/award-reveal.mp3",
+  correct: "/assets/sounds/correct%20answer.mp3",
+  rewardUnlock: "/assets/sounds/magic%20reward%20unlock.mp3",
   announcement: "/assets/sounds/announcement.mp3",
   star: "/assets/sounds/star-collected.mp3",
   wrong: "/assets/sounds/wrong-answer.mp3"
@@ -97,7 +103,7 @@ for (const [key, url] of Object.entries(expectedSoundAssets)) {
     errors.push(`soundAssets.${key} must be ${url}`);
     continue;
   }
-  const filePath = path.join(rootDir, "public", url.replace(/^\/+/, ""));
+  const filePath = path.join(rootDir, "public", decodeURIComponent(url.replace(/^\/+/, "")));
   if (!fs.existsSync(filePath)) {
     errors.push(`Missing sound asset: ${url}`);
   }
@@ -114,6 +120,12 @@ if (!fs.existsSync(path.join(rootDir, "public", "assets", "images", "eli_.icon")
 const serviceWorker = fs.readFileSync(path.join(rootDir, "public", "sw.js"), "utf8");
 if (!serviceWorker.includes("eli-english-quest-v3") || !serviceWorker.includes("networkFirstHtml")) {
   errors.push("Service worker must use the v3 network-first update strategy");
+}
+
+const mainSource = fs.readFileSync(path.join(rootDir, "src", "main.js"), "utf8");
+const starEffectUses = mainSource.match(/playEffect\("star"\)/g) || [];
+if (starEffectUses.length !== 1) {
+  errors.push("Star sound should only play once in the mode-completion star accounting path");
 }
 
 for (const level of levels) {

@@ -31,9 +31,9 @@ Tested with local Vite dev server at `http://localhost:5173/` in headless Micros
   - `ui-click.mp3`
   - `startup-screen-sound.mp3`
   - `new-level-opened.mp3`
+  - `correct%20answer.mp3`
   - `star-collected.mp3`
-  - `award-reveal.mp3`
-  - `announcement.mp3`
+  - `magic%20reward%20unlock.mp3`
   - `wrong-answer.mp3`
 - Recorded MP3 volumes stayed at or below `0.4`.
 
@@ -43,6 +43,7 @@ Tested with local Vite dev server at `http://localhost:5173/` in headless Micros
 - Map showed 8 levels; only Room Castle was unlocked on a fresh save.
 - Room Castle exposed all 5 modes.
 - Quiz correct-answer feedback auto-advanced to the next question without showing `Next`.
+- Correct answers used `correct answer.mp3`; `star-collected.mp3` was reserved for the mode-completion star accounting moment.
 - Quiz wrong-answer feedback stayed on the same question after 1.4 seconds, showed the correct answer, showed the learning cue, played `wrong-answer.mp3`, and required `Next`.
 - `Read question` showed `Reading...` and sent the question text to speech synthesis.
 - Finishing Quiz returned directly to the Room Castle level menu, showed the short level burst, and styled the 3-star Quiz card as `Done`.
@@ -52,9 +53,10 @@ Tested with local Vite dev server at `http://localhost:5173/` in headless Micros
 - Completing Quiz, Picture Match, and Memory with 8+ total stars unlocked Breakfast Cafe.
 - Listen & Say tap fallback completed and saved progress when speech recognition was disabled in the smoke harness.
 - Progress persisted after reload with 11 total stars and Breakfast Cafe still unlocked.
-- Trophy Room showed 5 milestone collectibles; Magic Egg unlocked at 10+ stars and Magic Feather remained locked at 20 stars.
+- Trophy Room showed 5 milestone collectibles; Magic Egg unlocked at 10+ stars, stood out with stronger styling, and Magic Feather remained locked at 20 stars.
+- New milestone rewards played `magic reward unlock.mp3` when earned and again on the first Trophy Room reveal, with one-time confetti. The pending reveal queue cleared after that first Trophy Room visit.
 - A synthetic all-level localStorage fixture confirmed all 8 base levels can open and each exposes 5 modes.
-- A synthetic 9-star fixture confirmed crossing the 10-star milestone triggers the Magic Egg award path and announcement sound.
+- A synthetic 9-star fixture confirmed crossing the 10-star milestone triggers the Magic Egg reward-unlock sound path.
 
 ## Not tested
 

@@ -871,8 +871,8 @@ button:disabled {
 .reward-grid,
 .trophy-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(138px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+  gap: 12px;
   margin-top: 12px;
 }
 
@@ -889,12 +889,37 @@ button:disabled {
 }
 
 .reward-card {
+  position: relative;
+  overflow: hidden;
   background: linear-gradient(145deg, #fff, #fff0fb);
   border: 1px solid var(--line);
 }
 
 .reward-card.unlocked {
-  box-shadow: var(--glow);
+  border: 2px solid rgba(217, 70, 239, 0.48);
+  background:
+    radial-gradient(circle at 50% 12%, rgba(255, 209, 102, 0.72), transparent 28%),
+    linear-gradient(145deg, #fff, #ffe1f4 45%, #eadbff);
+  box-shadow: var(--glow), 0 16px 34px rgba(217, 70, 239, 0.24);
+  animation: trophyBounce 2.8s ease-in-out infinite;
+}
+
+.reward-card.unlocked::before {
+  content: "";
+  position: absolute;
+  inset: -40%;
+  background: conic-gradient(from 90deg, transparent, rgba(255, 255, 255, 0.75), transparent 28%);
+  opacity: 0.6;
+  animation: trophyShine 4.2s linear infinite;
+}
+
+.reward-card.unlocked > * {
+  position: relative;
+  z-index: 1;
+}
+
+.reward-card.newly-revealed {
+  animation: trophyReveal 1.1s cubic-bezier(0.2, 1.35, 0.32, 1), trophyBounce 2.8s ease-in-out 1.1s infinite;
 }
 
 .reward-card.locked {
@@ -903,7 +928,33 @@ button:disabled {
 }
 
 .reward-icon {
-  font-size: 2.5rem;
+  display: grid;
+  place-items: center;
+  width: 74px;
+  height: 74px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff8c7, #ff8bd3 58%, #8b5cf6);
+  color: white;
+  font-size: 3.2rem;
+  text-shadow: 0 3px 0 rgba(74, 23, 109, 0.18);
+  box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.7), 0 12px 24px rgba(139, 92, 246, 0.28);
+}
+
+.reward-card.locked .reward-icon {
+  background: #f1e7f7;
+  color: var(--muted);
+  box-shadow: none;
+  text-shadow: none;
+}
+
+.reward-card.unlocked strong {
+  color: #4a176d;
+  font-size: 1.05rem;
+}
+
+.reward-card.unlocked small {
+  color: #9b3f02;
+  font-weight: 950;
 }
 
 .reward-card p {
@@ -915,6 +966,71 @@ button:disabled {
 
 .trophy {
   background: #fff0b8;
+}
+
+.trophy-room {
+  position: relative;
+  overflow: hidden;
+}
+
+.reward-confetti {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.reward-confetti span {
+  --x: 0px;
+  --spin: 0deg;
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  color: var(--primary);
+  font-size: 1.3rem;
+  filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.9));
+  animation: confettiFall 1.8s ease-out forwards;
+}
+
+.reward-confetti span:nth-child(1) {
+  --x: -136px;
+  --spin: -80deg;
+}
+
+.reward-confetti span:nth-child(2) {
+  --x: -72px;
+  --spin: 120deg;
+  animation-delay: 0.08s;
+  color: #f59e0b;
+}
+
+.reward-confetti span:nth-child(3) {
+  --x: -12px;
+  --spin: -150deg;
+  animation-delay: 0.16s;
+  color: #22c55e;
+}
+
+.reward-confetti span:nth-child(4) {
+  --x: 48px;
+  --spin: 90deg;
+  animation-delay: 0.24s;
+  color: #06b6d4;
+}
+
+.reward-confetti span:nth-child(5) {
+  --x: 108px;
+  --spin: -120deg;
+  animation-delay: 0.32s;
+  color: #ec4899;
+}
+
+.reward-confetti span:nth-child(6) {
+  --x: 152px;
+  --spin: 160deg;
+  animation-delay: 0.4s;
+  color: #8b5cf6;
 }
 
 .bonus-list {
@@ -981,6 +1097,60 @@ button:disabled {
   to {
     opacity: 1;
     transform: scale(1);
+  }
+}
+
+@keyframes trophyBounce {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+
+  50% {
+    transform: translateY(-4px) scale(1.02);
+  }
+}
+
+@keyframes trophyReveal {
+  0% {
+    opacity: 0;
+    transform: scale(0.62) rotate(-4deg);
+  }
+
+  58% {
+    opacity: 1;
+    transform: scale(1.12) rotate(2deg);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+@keyframes trophyShine {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes confettiFall {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -20px) rotate(0deg) scale(0.7);
+  }
+
+  14% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--x)), 280px) rotate(var(--spin)) scale(1.1);
   }
 }
 

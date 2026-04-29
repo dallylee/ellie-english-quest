@@ -739,7 +739,6 @@ function renderBuild() {
       const nextIndex = ui.buildChosen.length;
       if (sentence[nextIndex] === word) {
         ui.buildChosen.push({ word, index: nextIndex });
-        playEffect("star");
         if (ui.buildChosen.length === sentence.length) {
           playEffect("correct");
           speakText(`Great sentence. ${sentence.join(" ")}.`);
@@ -787,13 +786,13 @@ function finishMode(mode, correct, total) {
   const newRewards = progress.trophies.filter((item) => !trophiesBefore.has(item));
 
   if (newRewards.length) {
-    playEffect("award");
+    playEffect("rewardUnlock");
   } else if (nextUnlockedNow) {
     playEffect("level");
   } else {
     playEffect("star");
   }
-  if (newRewards.length || nextUnlockedNow) {
+  if (!newRewards.length && nextUnlockedNow) {
     setTimeout(() => playEffect("announcement"), 180);
   }
 
@@ -809,16 +808,26 @@ function finishMode(mode, correct, total) {
 
 function renderTrophies() {
   const legacyTrophies = progress.trophies.filter((item) => !rewardMilestones.some((reward) => reward.title === item));
+  const pendingRewardSet = new Set(
+    (progress.pendingRewardReveals || []).filter((title) => progress.trophies.includes(title))
+  );
+  const hasNewRewardReveal = pendingRewardSet.size > 0;
   page("Trophy Room", `
-    <section class="card trophy-room">
+    <section class="card trophy-room ${hasNewRewardReveal ? "celebrating-reward" : ""}">
+      ${hasNewRewardReveal ? `
+        <div class="reward-confetti" aria-hidden="true">
+          <span>✦</span><span>★</span><span>◆</span><span>✧</span><span>★</span><span>✦</span>
+        </div>
+      ` : ""}
       <p class="eyebrow">Magic rewards</p>
       <h2>Total stars: ${progress.totalStars}</h2>
       <p class="muted">Collect stars. Unlock magic things.</p>
       <div class="reward-grid">
         ${rewardMilestones.map((reward) => {
           const unlocked = progress.totalStars >= reward.stars;
+          const newlyRevealed = pendingRewardSet.has(reward.title);
           return `
-            <div class="reward-card ${unlocked ? "unlocked" : "locked"}">
+            <div class="reward-card ${unlocked ? "unlocked" : "locked"} ${newlyRevealed ? "newly-revealed" : ""}">
               <span class="reward-icon">${unlocked ? reward.icon : "🔒"}</span>
               <strong>${reward.title}</strong>
               <small>${reward.stars} stars</small>
@@ -850,6 +859,14 @@ function renderTrophies() {
       render();
     }
   });
+
+  if (hasNewRewardReveal) {
+    playEffect("rewardUnlock");
+    progress.pendingRewardReveals = (progress.pendingRewardReveals || []).filter(
+      (title) => !pendingRewardSet.has(title)
+    );
+    progress = saveProgress(progress);
+  }
 }
 
 function shuffle(items) {

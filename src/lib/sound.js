@@ -3,6 +3,8 @@ export const soundAssets = {
   ui: "/assets/sounds/ui-click.mp3",
   level: "/assets/sounds/new-level-opened.mp3",
   award: "/assets/sounds/award-reveal.mp3",
+  correct: "/assets/sounds/correct%20answer.mp3",
+  rewardUnlock: "/assets/sounds/magic%20reward%20unlock.mp3",
   announcement: "/assets/sounds/announcement.mp3",
   star: "/assets/sounds/star-collected.mp3",
   wrong: "/assets/sounds/wrong-answer.mp3"
@@ -13,12 +15,13 @@ const effectAssets = {
   startup: "welcome",
   ui: "ui",
   click: "ui",
-  correct: "star",
+  correct: "correct",
   wrong: "wrong",
   star: "star",
   level: "level",
   unlock: "level",
   award: "award",
+  rewardUnlock: "rewardUnlock",
   announcement: "announcement"
 };
 
@@ -97,6 +100,7 @@ function playGeneratedSound(type) {
       ui: [659.25],
       welcome: [523.25, 783.99, 1046.5],
       award: [783.99, 1046.5, 1318.51],
+      rewardUnlock: [783.99, 1046.5, 1318.51, 1567.98],
       announcement: [392, 523.25, 659.25]
     };
 
