@@ -200,6 +200,7 @@ function mergeSagaProgress(defaultSaga, parsedSaga = {}) {
       unlockedLevelIds: mergeArray(parsedSky.unlockedLevelIds, unlockedLevelIdsByWorld["sky-islands"]),
       completedIslandIds: mergeArray(parsedSky.completedIslandIds),
       completedLevelIds: mergeArray(parsedSky.completedLevelIds, completedLevelIdsByWorld["sky-islands"]),
+      completed: Boolean(parsedSky.completed),
       collectedRewards: mergeArray(parsedSky.collectedRewards, collectedRewardsByWorld["sky-islands"]),
       clueProgress: mergeObject(parsedSky.clueProgress),
       taskProgress: mergeObject(parsedSky.taskProgress, completedTaskIdsByLevel["sky-islands"]),
@@ -233,7 +234,8 @@ export function createDefaultProgress() {
     saga: createDefaultSagaProgress(),
     settings: {
       soundEnabled: true,
-      voiceEnabled: false
+      voiceEnabled: true,
+      voicePreferenceSet: false
     },
     lastPlayedLevelId: levels[0]?.id || null,
     updatedAt: new Date().toISOString()
@@ -248,13 +250,19 @@ export function loadProgress() {
     const defaults = createDefaultProgress();
 
     // Merge safely so new levels added later do not break old saves.
+    const parsedSettings = parsed.settings || {};
+    const mergedSettings = {
+      ...defaults.settings,
+      ...parsedSettings
+    };
+    if (parsedSettings.voicePreferenceSet !== true) {
+      mergedSettings.voiceEnabled = true;
+    }
+
     const mergedProgress = {
       ...defaults,
       ...parsed,
-      settings: {
-        ...defaults.settings,
-        ...(parsed.settings || {})
-      },
+      settings: mergedSettings,
       saga: mergeSagaProgress(defaults.saga, parsed.saga || {}),
       levelProgress: { ...defaults.levelProgress }
     };

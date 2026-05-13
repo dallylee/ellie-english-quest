@@ -307,8 +307,8 @@ export const skyIslands = [
     reward: "Storm Crown Key",
     color: "#b180ff",
     position: [4.85, 0.8, 0.4],
-    intro: "The final island is loud and windy. The orb needs brave full sentences.",
-    bridgeHint: "Use longer answers to solve the final mystery.",
+    intro: "A soft storm hides the Crown Door. Luma needs brave, kind sentences.",
+    bridgeHint: "Use all the Sky rewards to solve the final mystery.",
     clues: [
       {
         id: "storm-problem",

@@ -473,6 +473,31 @@ function HighlightRing({ active, color = "#fff0a8" }) {
   );
 }
 
+function ActiveObjectAura({
+  active,
+  complete,
+  color,
+  intensity = 1.4,
+  distance = 2.5,
+  completeCount = 9,
+  activeCount = 5,
+  completeRadius = 0.62,
+  activeRadius = 0.42
+}) {
+  return (
+    <>
+      <pointLight intensity={active || complete ? intensity : 0.24} color={color} distance={distance} />
+      <HighlightRing active={active} color={color} />
+      <SparkleCluster
+        active={active || complete}
+        color={color}
+        count={complete ? completeCount : activeCount}
+        radius={complete ? completeRadius : activeRadius}
+      />
+    </>
+  );
+}
+
 function FlagCloth({ complete, active }) {
   const mesh = useRef(null);
   useFrame((state) => {
@@ -947,6 +972,1475 @@ function BreakfastObject({ objectKey, position, active, complete }) {
   );
 }
 
+function StarLensModel({ complete, active, dusty = false, scale = 1 }) {
+  return (
+    <group scale={scale}>
+      <mesh rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[0.32, 0.045, 14, 54]} />
+        <meshStandardMaterial
+          color={complete ? "#dff7ff" : "#b9c9ff"}
+          emissive={complete ? "#baf6ff" : active ? "#8a8dff" : "#39406f"}
+          emissiveIntensity={complete ? 1.25 : active ? 0.58 : 0.16}
+          metalness={0.22}
+          roughness={0.25}
+        />
+      </mesh>
+      <mesh rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.25, 0.25, 0.035, 42]} />
+        <meshPhysicalMaterial
+          color={complete ? "#e4fbff" : "#c6d1ff"}
+          emissive={complete ? "#8df3ff" : "#4552aa"}
+          emissiveIntensity={complete ? 0.72 : active ? 0.28 : 0.08}
+          transparent
+          opacity={complete ? 0.82 : 0.58}
+          roughness={0.08}
+          metalness={0.04}
+          transmission={0.18}
+        />
+      </mesh>
+      <mesh position={[0.28, -0.28, 0]} rotation={[0, 0, -0.78]} scale={[0.08, 0.34, 0.08]}>
+        <cylinderGeometry args={[1, 1, 1, 12]} />
+        <meshStandardMaterial color="#b7c8ff" emissive={complete ? "#baf6ff" : "#314078"} emissiveIntensity={complete ? 0.48 : 0.1} roughness={0.32} />
+      </mesh>
+      <mesh position={[0, 0, 0.035]} rotation={[0, 0, 0.2]} scale={[0.09, 0.09, 0.025]}>
+        <octahedronGeometry args={[1, 0]} />
+        <meshStandardMaterial color="#fff0a8" emissive="#ffd45c" emissiveIntensity={complete || active ? 1.2 : 0.32} />
+      </mesh>
+      {dusty && !complete ? (
+        <>
+          <mesh position={[-0.08, 0.08, 0.07]} scale={[0.12, 0.04, 0.02]}>
+            <sphereGeometry args={[1, 10, 8]} />
+            <meshStandardMaterial color="#9aa0b0" transparent opacity={0.72} roughness={0.95} />
+          </mesh>
+          <mesh position={[0.1, -0.07, 0.07]} scale={[0.16, 0.05, 0.02]}>
+            <sphereGeometry args={[1, 10, 8]} />
+            <meshStandardMaterial color="#8f95a5" transparent opacity={0.68} roughness={0.95} />
+          </mesh>
+        </>
+      ) : null}
+    </group>
+  );
+}
+
+function TelescopeMesh({ complete, active }) {
+  const group = useRef(null);
+
+  useFrame((state) => {
+    if (!group.current) return;
+    const targetZ = complete ? -0.1 : -0.42;
+    group.current.rotation.z += (targetZ - group.current.rotation.z) * 0.05;
+    group.current.position.y = 0.42 + Math.sin(state.clock.elapsedTime * 1.25) * (active || complete ? 0.035 : 0.015);
+  });
+
+  return (
+    <group ref={group} rotation={[0, 0, -0.42]}>
+      <mesh position={[0, 0.2, 0]} rotation={[0, 0, Math.PI / 2]} scale={[0.26, 0.68, 0.26]}>
+        <cylinderGeometry args={[0.55, 0.42, 1, 28]} />
+        <meshStandardMaterial color="#3f7dff" emissive={complete ? "#89c4ff" : active ? "#5c8cff" : "#182a6f"} emissiveIntensity={complete ? 0.8 : active ? 0.45 : 0.12} roughness={0.36} />
+      </mesh>
+      <mesh position={[0.58, 0.2, 0]} rotation={[0, 0, Math.PI / 2]} scale={[0.31, 0.16, 0.31]}>
+        <cylinderGeometry args={[0.58, 0.5, 1, 28]} />
+        <meshStandardMaterial color="#baf6ff" emissive="#77e6ff" emissiveIntensity={active || complete ? 0.78 : 0.22} roughness={0.24} />
+      </mesh>
+      <mesh position={[-0.48, 0.2, 0]} rotation={[0, 0, Math.PI / 2]} scale={[0.22, 0.14, 0.22]}>
+        <cylinderGeometry args={[0.52, 0.42, 1, 20]} />
+        <meshStandardMaterial color="#152966" emissive="#3f7dff" emissiveIntensity={active || complete ? 0.38 : 0.1} roughness={0.42} />
+      </mesh>
+      <mesh position={[0, -0.25, 0]} scale={[0.06, 0.72, 0.06]}>
+        <cylinderGeometry args={[1, 1, 1, 10]} />
+        <meshStandardMaterial color="#dce8ff" roughness={0.38} />
+      </mesh>
+      <mesh position={[0, -0.62, 0]} scale={[0.42, 0.05, 0.42]}>
+        <cylinderGeometry args={[1, 1, 1, 20]} />
+        <meshStandardMaterial color="#9fb5f2" emissive={active || complete ? "#778dff" : "#253568"} emissiveIntensity={active || complete ? 0.36 : 0.08} />
+      </mesh>
+      {complete ? (
+        <mesh position={[1.12, 0.52, 0]} scale={[0.14, 0.14, 0.14]}>
+          <octahedronGeometry args={[1, 0]} />
+          <meshStandardMaterial color="#fff0a8" emissive="#ffd45c" emissiveIntensity={1.65} />
+        </mesh>
+      ) : null}
+    </group>
+  );
+}
+
+function StarClockFace({ complete, active }) {
+  const hand = useRef(null);
+
+  useFrame((state) => {
+    if (!hand.current) return;
+    hand.current.rotation.z = complete ? -1.2 + Math.sin(state.clock.elapsedTime * 2.4) * 0.05 : Math.sin(state.clock.elapsedTime * 1.3) * 0.18;
+  });
+
+  return (
+    <group>
+      <mesh rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.38, 0.38, 0.05, 42]} />
+        <meshStandardMaterial color="#e8efff" emissive={complete ? "#fff0a8" : active ? "#9cb7ff" : "#4d5a92"} emissiveIntensity={complete ? 0.7 : active ? 0.35 : 0.12} roughness={0.42} />
+      </mesh>
+      <mesh rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[0.39, 0.025, 10, 48]} />
+        <meshStandardMaterial color="#fff0a8" emissive="#ffd45c" emissiveIntensity={active || complete ? 0.8 : 0.24} />
+      </mesh>
+      {[0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 11].map((index) => {
+        const angle = (index / 12) * Math.PI * 2;
+        return (
+          <mesh key={index} position={[Math.sin(angle) * 0.28, Math.cos(angle) * 0.28, 0.035]} scale={[0.022, 0.022, 0.022]}>
+            <sphereGeometry args={[1, 8, 8]} />
+            <meshBasicMaterial color={active || complete ? "#fff8d8" : "#bac4e8"} />
+          </mesh>
+        );
+      })}
+      {complete ? (
+        <Html center transform distanceFactor={7} position={[-0.28, 0, 0.08]}>
+          <div style={{ color: "#fff8d8", fontWeight: 1000, fontSize: "1.1rem", textShadow: "0 0 10px #ffd45c" }}>9</div>
+        </Html>
+      ) : (
+        <mesh position={[-0.28, 0, 0.04]} scale={[0.04, 0.04, 0.04]}>
+          <sphereGeometry args={[1, 8, 8]} />
+          <meshStandardMaterial color="#6b7398" transparent opacity={0.56} />
+        </mesh>
+      )}
+      <mesh ref={hand} position={[0, 0, 0.06]} scale={[0.035, 0.24, 0.035]}>
+        <boxGeometry args={[1, 1, 1]} />
+        <meshStandardMaterial color="#5267d8" emissive="#8a8dff" emissiveIntensity={active || complete ? 0.65 : 0.18} />
+      </mesh>
+    </group>
+  );
+}
+
+function MagicBagMesh({ complete, active }) {
+  return (
+    <group>
+      <mesh position={[0, 0.2, 0]} scale={[0.38, 0.32, 0.18]}>
+        <sphereGeometry args={[1, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.72]} />
+        <meshStandardMaterial color="#6e54d9" emissive={active || complete ? "#8a8dff" : "#2f2767"} emissiveIntensity={complete ? 0.6 : active ? 0.32 : 0.08} roughness={0.58} />
+      </mesh>
+      <mesh position={[0, 0.46, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[0.25, 0.025, 8, 28, Math.PI]} />
+        <meshStandardMaterial color="#ffd0ed" emissive="#ff83c6" emissiveIntensity={active || complete ? 0.52 : 0.16} />
+      </mesh>
+      <mesh position={[complete ? 0.02 : -0.38, complete ? 0.48 : 0.38, 0.06]} rotation={[0.2, 0, complete ? 0.12 : -0.4]} scale={[0.18, 0.05, 0.24]}>
+        <boxGeometry args={[1, 1, 1]} />
+        <meshStandardMaterial color="#fff8d8" emissive={complete ? "#ffd45c" : "#a87934"} emissiveIntensity={complete ? 0.55 : active ? 0.2 : 0.05} roughness={0.6} />
+      </mesh>
+      <mesh position={[0.34, 0.42, 0.03]} rotation={[0, 0, -0.48]} scale={[0.04, 0.3, 0.04]}>
+        <cylinderGeometry args={[1, 1, 1, 8]} />
+        <meshStandardMaterial color="#ffe68c" emissive="#ffd45c" emissiveIntensity={active || complete ? 0.42 : 0.12} />
+      </mesh>
+      <mesh position={[0.49, 0.58, 0.03]} scale={[0.08, 0.08, 0.03]}>
+        <octahedronGeometry args={[1, 0]} />
+        <meshStandardMaterial color="#fff0a8" emissive="#ffd45c" emissiveIntensity={active || complete ? 0.8 : 0.25} />
+      </mesh>
+      {complete ? (
+        <>
+          <mesh position={[-0.36, 0.34, 0]} rotation={[0, 0, 0.48]} scale={[0.18, 0.045, 0.08]}>
+            <sphereGeometry args={[1, 12, 8]} />
+            <meshStandardMaterial color="#eafcff" emissive="#baf6ff" emissiveIntensity={0.5} transparent opacity={0.82} />
+          </mesh>
+          <mesh position={[0.36, 0.34, 0]} rotation={[0, 0, -0.48]} scale={[0.18, 0.045, 0.08]}>
+            <sphereGeometry args={[1, 12, 8]} />
+            <meshStandardMaterial color="#eafcff" emissive="#baf6ff" emissiveIntensity={0.5} transparent opacity={0.82} />
+          </mesh>
+        </>
+      ) : null}
+    </group>
+  );
+}
+
+function PencilStarMesh({ complete, active }) {
+  return (
+    <group>
+      <CloudPuff position={[complete ? -0.34 : 0.02, 0.16, 0]} scale={0.5} opacity={active || complete ? 0.62 : 0.74} />
+      <mesh position={[complete ? 0.28 : -0.1, complete ? 0.64 : 0.32, 0.02]} rotation={[0, 0, -0.75]} scale={[0.045, 0.42, 0.045]}>
+        <cylinderGeometry args={[1, 1, 1, 10]} />
+        <meshStandardMaterial color="#ffe68c" emissive="#ffd45c" emissiveIntensity={complete ? 0.95 : active ? 0.48 : 0.16} />
+      </mesh>
+      <mesh position={[complete ? 0.44 : 0.06, complete ? 0.78 : 0.46, 0.02]} rotation={[0, 0, -0.75]} scale={[0.08, 0.12, 0.08]}>
+        <coneGeometry args={[1, 1, 5]} />
+        <meshStandardMaterial color="#fff0a8" emissive="#ffd45c" emissiveIntensity={complete ? 1.2 : active ? 0.7 : 0.25} />
+      </mesh>
+      <mesh position={[complete ? 0.22 : -0.16, complete ? 0.54 : 0.22, 0.02]} scale={[0.1, 0.1, 0.03]}>
+        <octahedronGeometry args={[1, 0]} />
+        <meshStandardMaterial color="#fff8d8" emissive="#ffd45c" emissiveIntensity={complete ? 1 : active ? 0.62 : 0.22} />
+      </mesh>
+    </group>
+  );
+}
+
+function StarPathBoardMesh({ complete, active }) {
+  const line = useRef(null);
+
+  useFrame((state) => {
+    if (!line.current) return;
+    const target = complete ? 1 : active ? 0.5 + Math.sin(state.clock.elapsedTime * 3) * 0.05 : 0.08;
+    line.current.scale.x += (target - line.current.scale.x) * 0.08;
+  });
+
+  return (
+    <group>
+      <mesh position={[0, 0.42, 0]} scale={[0.82, 0.48, 0.055]}>
+        <boxGeometry args={[1, 1, 1]} />
+        <meshStandardMaterial color="#18375f" emissive={active || complete ? "#1d6d8d" : "#081b31"} emissiveIntensity={active || complete ? 0.32 : 0.1} roughness={0.62} />
+      </mesh>
+      <mesh position={[0, 0.17, 0]} scale={[0.9, 0.045, 0.08]}>
+        <boxGeometry args={[1, 1, 1]} />
+        <meshStandardMaterial color="#d7c08c" roughness={0.58} />
+      </mesh>
+      {[-0.32, -0.14, 0.05, 0.24, 0.42].map((x, index) => (
+        <mesh key={x} position={[x, 0.32 + Math.sin(index * 1.2) * 0.12, 0.075]} scale={[0.026, 0.026, 0.026]}>
+          <sphereGeometry args={[1, 8, 8]} />
+          <meshBasicMaterial color={complete ? "#fff0a8" : active ? "#dff7ff" : "#7990b5"} transparent opacity={active || complete ? 0.9 : 0.55} />
+        </mesh>
+      ))}
+      <mesh ref={line} position={[0.05, 0.42, 0.09]} rotation={[0, 0, 0.24]} scale={[complete ? 1 : 0.08, 1, 1]}>
+        <boxGeometry args={[0.86, 0.025, 0.025]} />
+        <meshBasicMaterial color="#fff0a8" transparent opacity={active || complete ? 0.86 : 0.18} depthWrite={false} />
+      </mesh>
+      <mesh position={[0.47, 0.55, 0.1]} scale={[0.07, 0.07, 0.03]}>
+        <octahedronGeometry args={[1, 0]} />
+        <meshStandardMaterial color="#fff0a8" emissive="#ffd45c" emissiveIntensity={active || complete ? 1 : 0.35} />
+      </mesh>
+    </group>
+  );
+}
+
+function LensBeam({ active }) {
+  const beam = useRef(null);
+
+  useFrame((state) => {
+    if (!beam.current) return;
+    beam.current.material.opacity = active ? 0.32 + Math.sin(state.clock.elapsedTime * 4) * 0.06 : 0;
+  });
+
+  return (
+    <mesh ref={beam} position={[0.08, 0.78, -0.28]} rotation={[0.88, 0, -0.3]} scale={[0.14, 1.6, 0.14]}>
+      <coneGeometry args={[1, 1, 28, 1, true]} />
+      <meshBasicMaterial color="#baf6ff" transparent opacity={0} depthWrite={false} />
+    </mesh>
+  );
+}
+
+function MusicSignal({ active }) {
+  const group = useRef(null);
+
+  useFrame((state) => {
+    if (!group.current) return;
+    group.current.rotation.y += 0.018;
+    group.current.position.y = 0.74 + Math.sin(state.clock.elapsedTime * 1.7) * 0.05;
+  });
+
+  if (!active) return null;
+
+  return (
+    <group ref={group} position={[0, 0.74, 0]}>
+      <mesh position={[0, 0.1, 0]} scale={[0.045, 0.46, 0.045]}>
+        <cylinderGeometry args={[1, 1, 1, 10]} />
+        <meshStandardMaterial color="#ff83c6" emissive="#ffd0ed" emissiveIntensity={0.9} />
+      </mesh>
+      <mesh position={[0.2, 0.28, 0]} scale={[0.18, 0.04, 0.04]}>
+        <boxGeometry args={[1, 1, 1]} />
+        <meshStandardMaterial color="#ff83c6" emissive="#ffd0ed" emissiveIntensity={0.9} />
+      </mesh>
+      <mesh position={[-0.02, -0.18, 0]} scale={[0.14, 0.1, 0.08]}>
+        <sphereGeometry args={[1, 16, 10]} />
+        <meshStandardMaterial color="#fff0a8" emissive="#ffd45c" emissiveIntensity={0.95} />
+      </mesh>
+      <WindRibbon active complete color="#ffb8df" />
+    </group>
+  );
+}
+
+function StarClueMesh({ complete, active }) {
+  return (
+    <group>
+      <mesh position={[0, 0.56, 0]} scale={[0.16, 0.16, 0.05]}>
+        <octahedronGeometry args={[1, 0]} />
+        <meshStandardMaterial color="#fff0a8" emissive="#ffd45c" emissiveIntensity={active || complete ? 1.3 : 0.42} />
+      </mesh>
+      <mesh position={[0, 0.56, 0]} rotation={[Math.PI / 2, 0, 0]} scale={[0.24, 0.24, 0.24]}>
+        <torusGeometry args={[0.62, 0.035, 8, 28]} />
+        <meshBasicMaterial color="#fff8d8" transparent opacity={active || complete ? 0.54 : 0.2} depthWrite={false} />
+      </mesh>
+      <MusicSignal active={complete} />
+    </group>
+  );
+}
+
+function ObservatoryDomeObject({ complete, active }) {
+  const roof = useRef(null);
+
+  useFrame((state) => {
+    if (!roof.current) return;
+    const targetY = complete ? 0.82 : 0.48;
+    const targetScale = complete ? 0.82 : 1;
+    roof.current.position.y += (targetY - roof.current.position.y) * 0.06;
+    roof.current.scale.setScalar(roof.current.scale.x + (targetScale - roof.current.scale.x) * 0.06);
+    roof.current.rotation.y += complete ? 0.01 : active ? 0.004 : 0.001;
+  });
+
+  return (
+    <group>
+      <mesh ref={roof} position={[0, 0.48, 0]} scale={[1, 1, 1]}>
+        <sphereGeometry args={[0.48, 28, 12, 0, Math.PI * 2, 0, Math.PI * 0.54]} />
+        <meshPhysicalMaterial
+          color="#dff7ff"
+          emissive={complete ? "#baf6ff" : active ? "#6f84ff" : "#263a73"}
+          emissiveIntensity={complete ? 0.5 : active ? 0.28 : 0.08}
+          transparent
+          opacity={complete ? 0.34 : 0.72}
+          roughness={0.06}
+          transmission={0.28}
+        />
+      </mesh>
+      {[0, 1, 2, 3].map((index) => (
+        <mesh key={index} position={[0, complete ? 0.64 : 0.42, 0]} rotation={[complete ? 0.68 : 0.12, 0, index * (Math.PI / 2)]}>
+          <torusGeometry args={[0.38, 0.014, 8, 30, Math.PI]} />
+          <meshBasicMaterial color="#dff7ff" transparent opacity={complete ? 0.52 : 0.38} depthWrite={false} />
+        </mesh>
+      ))}
+      <mesh position={[0.16, complete ? 0.75 : 0.6, 0.32]} scale={[0.08, 0.08, 0.02]}>
+        <sphereGeometry args={[1, 16, 10, 0, Math.PI * 2, 0, Math.PI]} />
+        <meshStandardMaterial color="#fff0a8" emissive="#ffd45c" emissiveIntensity={active || complete ? 0.8 : 0.28} />
+      </mesh>
+      {complete ? <SparkleCluster active color="#fff8d8" count={12} radius={0.7} /> : null}
+    </group>
+  );
+}
+
+function SchoolStarObject({ objectKey, position, active, complete }) {
+  const group = useRef(null);
+  usePulse(group, active, 4.4, 0.046);
+  const glow = complete ? "#ffd45c" : active ? "#fff0a8" : "#aebdff";
+
+  useFrame((state) => {
+    if (!group.current) return;
+    group.current.position.y = position[1] + Math.sin(state.clock.elapsedTime * 1.32 + position[0]) * 0.024;
+    if (complete && objectKey !== "observatory-dome") group.current.rotation.y += 0.0045;
+  });
+
+  return (
+    <group ref={group} position={position}>
+      <pointLight intensity={active || complete ? 1.4 : 0.28} color={glow} distance={2.55} />
+      <HighlightRing active={active} color={glow} />
+      <SparkleCluster active={active || complete} color={glow} count={complete ? 10 : 5} radius={complete ? 0.62 : 0.42} />
+
+      {objectKey === "observatory-dome" ? <ObservatoryDomeObject complete={complete} active={active} /> : null}
+      {objectKey === "blue-telescope" ? <TelescopeMesh complete={complete} active={active} /> : null}
+      {objectKey === "star-clock" ? <StarClockFace complete={complete} active={active} /> : null}
+      {objectKey === "magic-bag" ? <MagicBagMesh complete={complete} active={active} /> : null}
+      {objectKey === "pencil-star" ? <PencilStarMesh complete={complete} active={active} /> : null}
+      {objectKey === "star-path-board" ? <StarPathBoardMesh complete={complete} active={active} /> : null}
+      {objectKey === "star-map-lens" ? (
+        <group>
+          <StarLensModel complete={complete} active={active} dusty scale={1} />
+          <LensBeam active={complete} />
+        </group>
+      ) : null}
+      {objectKey === "star-clue" ? <StarClueMesh complete={complete} active={active} /> : null}
+    </group>
+  );
+}
+
+function ConstellationTwinkles() {
+  const sparkles = useMemo(() => Array.from({ length: 28 }, (_, index) => {
+    const row = Math.floor(index / 7);
+    const column = index % 7;
+    return {
+      x: -3.1 + column * 1.02 + Math.sin(index * 1.7) * 0.16,
+      y: 1.35 + row * 0.42 + Math.cos(index * 0.9) * 0.12,
+      z: -2.2 - row * 0.28,
+      phase: index * 0.41,
+      speed: 0.72 + (index % 5) * 0.11,
+      scale: 0.025 + (index % 4) * 0.006,
+      float: 0.08 + (index % 3) * 0.035
+    };
+  }), []);
+
+  return sparkles.map((sparkle) => (
+    <MagicSparkle key={sparkle.phase} sparkle={sparkle} color={sparkle.phase % 2 ? "#dff7ff" : "#fff0a8"} active />
+  ));
+}
+
+function SchoolStarObservatoryScene({ level, activeTask, completedTaskIds, voiceActivity, rewardEvent }) {
+  const completed = new Set(completedTaskIds || []);
+  const objectPositions = {
+    "observatory-dome": [-1.72, 0.54, 0.22],
+    "blue-telescope": [-0.86, 0.46, -0.35],
+    "star-clock": [-0.1, 0.9, 0.76],
+    "magic-bag": [0.72, 0.38, -0.58],
+    "pencil-star": [1.32, 0.34, 0.32],
+    "star-path-board": [0.1, 0.62, -1.04],
+    "star-map-lens": [1.92, 0.42, -0.24],
+    "star-clue": [2.54, 0.86, 0.56]
+  };
+
+  return (
+    <>
+      <ConstellationTwinkles />
+      <FloatingClouds voiceActivity={voiceActivity} />
+      <group position={[0, -0.52, 0]} rotation={[0, -0.08, 0]}>
+        <CloudPuff position={[-1.9, -0.03, 0.82]} scale={1.12} opacity={0.38} />
+        <CloudPuff position={[1.8, -0.06, -0.88]} scale={1.08} opacity={0.34} />
+        <CloudPuff position={[2.8, -0.02, 0.92]} scale={0.76} opacity={0.36} />
+        <mesh receiveShadow scale={[2.92, 0.32, 1.52]}>
+          <dodecahedronGeometry args={[1, 0]} />
+          <meshStandardMaterial color="#2e397d" emissive="#5761c9" emissiveIntensity={0.18 + completed.size * 0.012} roughness={0.7} metalness={0.04} />
+        </mesh>
+        <mesh position={[0, 0.24, 0]} rotation={[Math.PI / 2, 0, 0]} scale={[1.94, 1.1, 1]}>
+          <torusGeometry args={[0.68, 0.034, 8, 52]} />
+          <meshBasicMaterial color="#baf6ff" transparent opacity={0.38} depthWrite={false} />
+        </mesh>
+        <mesh position={[-1.72, 0.37, 0.22]} scale={[0.98, 0.08, 0.98]}>
+          <cylinderGeometry args={[1, 1, 1, 32]} />
+          <meshStandardMaterial color="#eef8ff" emissive="#8a8dff" emissiveIntensity={0.18} roughness={0.42} />
+        </mesh>
+        <mesh position={[0.05, 0.28, -1.03]} scale={[1.2, 0.035, 0.12]}>
+          <boxGeometry args={[1, 1, 1]} />
+          <meshStandardMaterial color="#d7c08c" emissive={completed.has("draw-the-star-path") ? "#ffd45c" : "#6d5f34"} emissiveIntensity={completed.has("draw-the-star-path") ? 0.42 : 0.08} />
+        </mesh>
+        <mesh position={[2.92, 0.23, 0.95]} scale={[0.78, 0.1, 0.24]}>
+          <boxGeometry args={[1, 1, 1]} />
+          <meshStandardMaterial color="#dff7ff" emissive="#baf6ff" emissiveIntensity={completed.has("read-the-star-clue") ? 0.8 : 0.12} roughness={0.38} />
+        </mesh>
+        {completed.has("read-the-star-clue") ? (
+          <group position={[2.2, 0.74, 0.92]} scale={1.2}>
+            <MusicSignal active />
+            <SparkleCluster active color="#ffb8df" count={12} radius={0.84} />
+          </group>
+        ) : null}
+        {level.tasks.map((task) => (
+          <SchoolStarObject
+            key={task.id}
+            objectKey={task.objectKey}
+            position={objectPositions[task.objectKey] || [0, 0.26, 0]}
+            active={activeTask?.id === task.id}
+            complete={completed.has(task.id)}
+          />
+        ))}
+      </group>
+      {rewardEvent ? <CloudCompassReward rewardEvent={rewardEvent} /> : null}
+    </>
+  );
+}
+
+function MusicNote({ note, color = "#fff0a8", active = true }) {
+  const group = useRef(null);
+
+  useFrame((state) => {
+    if (!group.current) return;
+    const elapsed = state.clock.elapsedTime + note.phase;
+    group.current.position.set(
+      note.x + Math.sin(elapsed * 0.9) * note.sway,
+      note.y + Math.sin(elapsed * note.speed) * note.float,
+      note.z + Math.cos(elapsed * 0.8) * note.sway
+    );
+    group.current.rotation.z = note.tilt + Math.sin(elapsed * 1.4) * 0.16;
+    group.current.scale.setScalar(note.scale * (active ? 1 + Math.sin(elapsed * 2.2) * 0.08 : 0.74));
+  });
+
+  return (
+    <group ref={group} position={[note.x, note.y, note.z]} scale={note.scale} rotation={[0, 0, note.tilt]}>
+      <mesh position={[0, -0.1, 0]} scale={[0.11, 0.08, 0.05]}>
+        <sphereGeometry args={[1, 14, 10]} />
+        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={active ? 0.9 : 0.18} transparent opacity={active ? 0.88 : 0.34} />
+      </mesh>
+      <mesh position={[0.08, 0.13, 0]} scale={[0.025, 0.42, 0.025]}>
+        <cylinderGeometry args={[1, 1, 1, 8]} />
+        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={active ? 0.72 : 0.16} transparent opacity={active ? 0.9 : 0.32} />
+      </mesh>
+      <mesh position={[0.2, 0.3, 0]} scale={[0.18, 0.035, 0.025]}>
+        <boxGeometry args={[1, 1, 1]} />
+        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={active ? 0.72 : 0.16} transparent opacity={active ? 0.86 : 0.32} />
+      </mesh>
+    </group>
+  );
+}
+
+function MusicNotes({ active, color = "#fff0a8", count = 12, radius = 1.2 }) {
+  const notes = useMemo(() => Array.from({ length: count }, (_, index) => {
+    const angle = (index / count) * Math.PI * 2;
+    return {
+      x: Math.cos(angle) * radius * (0.56 + (index % 4) * 0.11),
+      y: 0.56 + (index % 5) * 0.18,
+      z: Math.sin(angle) * radius * 0.55,
+      phase: index * 0.58,
+      speed: 1.2 + (index % 5) * 0.16,
+      scale: 0.7 + (index % 3) * 0.12,
+      float: 0.06 + (index % 4) * 0.025,
+      sway: 0.04 + (index % 3) * 0.02,
+      tilt: index % 2 ? -0.16 : 0.18
+    };
+  }), [count, radius]);
+
+  if (!active) return null;
+  return notes.map((note) => (
+    <MusicNote key={note.phase} note={note} color={color} active={active} />
+  ));
+}
+
+function SoundRipple({ active, color = "#baf6ff", offset = 0 }) {
+  const mesh = useRef(null);
+
+  useFrame((state) => {
+    if (!mesh.current) return;
+    const pulse = active ? (state.clock.elapsedTime * 0.72 + offset) % 1 : 0;
+    mesh.current.scale.setScalar(0.55 + pulse * 1.15);
+    mesh.current.material.opacity = active ? 0.5 * (1 - pulse) : 0;
+  });
+
+  if (!active) return null;
+  return (
+    <mesh ref={mesh} rotation={[Math.PI / 2, 0, 0]}>
+      <torusGeometry args={[0.52, 0.014, 8, 56]} />
+      <meshBasicMaterial color={color} transparent opacity={0.35} depthWrite={false} />
+    </mesh>
+  );
+}
+
+function RhythmConfetti({ active, color = "#ffd0ed", count = 14, radius = 0.72 }) {
+  const confetti = useMemo(() => Array.from({ length: count }, (_, index) => {
+    const angle = (index / count) * Math.PI * 2;
+    return {
+      x: Math.cos(angle) * radius * (0.35 + (index % 4) * 0.12),
+      y: 0.28 + (index % 5) * 0.11,
+      z: Math.sin(angle) * radius * 0.5,
+      phase: index * 0.37,
+      scale: 0.035 + (index % 3) * 0.012
+    };
+  }), [count, radius]);
+
+  if (!active) return null;
+  return confetti.map((piece) => (
+    <MagicSparkle key={piece.phase} sparkle={{ ...piece, speed: 1.3, float: 0.12 }} color={piece.phase % 2 ? color : "#fff0a8"} active />
+  ));
+}
+
+function BouncingSpeaker({ position, active, side = 1 }) {
+  const group = useRef(null);
+
+  useFrame((state) => {
+    if (!group.current) return;
+    const elapsed = state.clock.elapsedTime + side;
+    group.current.position.y = position[1] + Math.sin(elapsed * (active ? 3.1 : 1.1)) * (active ? 0.055 : 0.018);
+    group.current.rotation.z = Math.sin(elapsed * 1.5) * 0.035 * side;
+  });
+
+  return (
+    <group ref={group} position={position}>
+      <mesh scale={[0.3, 0.52, 0.24]}>
+        <boxGeometry args={[1, 1, 1]} />
+        <meshStandardMaterial color="#4c4b92" emissive={active ? "#7b68ff" : "#151942"} emissiveIntensity={active ? 0.42 : 0.12} roughness={0.55} />
+      </mesh>
+      {[0.18, -0.16].map((y, index) => (
+        <mesh key={y} position={[0, y, 0.13]} rotation={[Math.PI / 2, 0, 0]} scale={[index ? 0.16 : 0.2, index ? 0.16 : 0.2, 0.06]}>
+          <cylinderGeometry args={[1, 1, 1, 24]} />
+          <meshStandardMaterial color="#2de0d4" emissive="#74fff6" emissiveIntensity={active ? 0.8 : 0.18} roughness={0.34} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+function StageLightBulb({ index, active, complete }) {
+  const bulb = useRef(null);
+  const beam = useRef(null);
+  const lit = complete || active;
+
+  useFrame((state) => {
+    const elapsed = state.clock.elapsedTime + index * 0.35;
+    if (bulb.current) {
+      const pop = lit ? 1 + Math.max(0, Math.sin(elapsed * 3.4)) * 0.08 : 0.86;
+      bulb.current.scale.setScalar(pop);
+    }
+    if (beam.current) {
+      beam.current.material.opacity = lit ? 0.18 + Math.max(0, Math.sin(elapsed * 2.6)) * 0.08 : 0.02;
+      beam.current.rotation.z = (index - 1.5) * 0.16 + Math.sin(elapsed * 1.2) * 0.06;
+    }
+  });
+
+  const x = (index - 1.5) * 0.42;
+  const colors = ["#fff0a8", "#ffd0ed", "#74fff6", "#ffd45c"];
+  const color = colors[index % colors.length];
+
+  return (
+    <group position={[x, 0, 0]}>
+      <mesh ref={bulb} position={[0, 0.18, 0]} rotation={[Math.PI / 2, 0, 0]} scale={[1, 1, 1]}>
+        <cylinderGeometry args={[0.12, 0.16, 0.16, 16]} />
+        <meshStandardMaterial color={lit ? color : "#d5d6ea"} emissive={color} emissiveIntensity={lit ? 1 : 0.1} roughness={0.36} />
+      </mesh>
+      <mesh ref={beam} position={[0, -0.34, 0]} rotation={[0.42, 0, 0]} scale={[0.11, 0.86, 0.11]}>
+        <coneGeometry args={[1, 1, 18, 1, true]} />
+        <meshBasicMaterial color={color} transparent opacity={0.03} depthWrite={false} />
+      </mesh>
+    </group>
+  );
+}
+
+function StageLightsMesh({ complete, active }) {
+  return (
+    <group>
+      <mesh position={[0, 0.42, 0]} scale={[1.1, 0.045, 0.045]}>
+        <boxGeometry args={[1, 1, 1]} />
+        <meshStandardMaterial color="#5a4aa8" emissive={active || complete ? "#ff83c6" : "#1c1646"} emissiveIntensity={active || complete ? 0.32 : 0.08} />
+      </mesh>
+      {[0, 1, 2, 3].map((index) => (
+        <StageLightBulb key={index} index={index} active={active} complete={complete} />
+      ))}
+    </group>
+  );
+}
+
+function MicrophoneMesh({ complete, active }) {
+  const head = useRef(null);
+
+  useFrame((state) => {
+    if (!head.current) return;
+    head.current.rotation.y += complete ? 0.012 : active ? 0.006 : 0.002;
+    head.current.position.y = 0.64 + Math.sin(state.clock.elapsedTime * 1.7) * (active || complete ? 0.04 : 0.012);
+  });
+
+  return (
+    <group>
+      <SoundRipple active={complete} color="#74fff6" offset={0.18} />
+      <SoundRipple active={complete} color="#ffd0ed" offset={0.58} />
+      <mesh position={[0, 0.28, 0]} scale={[0.035, 0.56, 0.035]}>
+        <cylinderGeometry args={[1, 1, 1, 12]} />
+        <meshStandardMaterial color="#dff7ff" emissive={active || complete ? "#74fff6" : "#4f6280"} emissiveIntensity={active || complete ? 0.42 : 0.08} />
+      </mesh>
+      <mesh position={[0, 0.02, 0]} scale={[0.32, 0.045, 0.2]}>
+        <boxGeometry args={[1, 1, 1]} />
+        <meshStandardMaterial color="#5a4aa8" emissive="#ff83c6" emissiveIntensity={active || complete ? 0.32 : 0.08} />
+      </mesh>
+      <mesh ref={head} position={[0, 0.64, 0]} scale={[0.2, 0.28, 0.2]}>
+        <sphereGeometry args={[1, 24, 18]} />
+        <meshStandardMaterial color={complete ? "#74fff6" : "#d9d9ff"} emissive={complete ? "#74fff6" : active ? "#ffd0ed" : "#4d5480"} emissiveIntensity={complete ? 1.1 : active ? 0.62 : 0.16} roughness={0.28} />
+      </mesh>
+      <mesh position={[-0.07, 0.68, 0.18]} rotation={[0, 0, complete ? 0 : 0.4]} scale={[0.042, 0.012, 0.012]}>
+        <boxGeometry args={[1, 1, 1]} />
+        <meshBasicMaterial color="#30345f" />
+      </mesh>
+      <mesh position={[0.07, 0.68, 0.18]} rotation={[0, 0, complete ? 0 : -0.4]} scale={[0.042, 0.012, 0.012]}>
+        <boxGeometry args={[1, 1, 1]} />
+        <meshBasicMaterial color="#30345f" />
+      </mesh>
+      {complete ? (
+        <mesh position={[0, 0.57, 0.19]} scale={[0.07, 0.018, 0.014]}>
+          <sphereGeometry args={[1, 10, 8]} />
+          <meshBasicMaterial color="#30345f" />
+        </mesh>
+      ) : null}
+    </group>
+  );
+}
+
+function RhythmPad({ index, active, complete }) {
+  const group = useRef(null);
+
+  useFrame((state) => {
+    if (!group.current) return;
+    const elapsed = state.clock.elapsedTime;
+    const beat = active || complete ? Math.max(0, Math.sin(elapsed * 4.2 - index * 0.72)) : 0;
+    group.current.position.y = 0.06 + beat * 0.1;
+    group.current.scale.y = 1 + beat * 0.22;
+  });
+
+  const colors = ["#74fff6", "#ffd0ed", "#fff0a8"];
+
+  return (
+    <group ref={group} position={[(index - 1) * 0.34, 0.06, 0]}>
+      <mesh rotation={[Math.PI / 2, 0, 0]} scale={[0.22, 0.22, 0.06]}>
+        <cylinderGeometry args={[1, 1, 1, 26]} />
+        <meshStandardMaterial color={colors[index]} emissive={colors[index]} emissiveIntensity={active || complete ? 0.82 : 0.2} roughness={0.42} />
+      </mesh>
+    </group>
+  );
+}
+
+function RhythmPadsMesh({ complete, active }) {
+  return (
+    <group>
+      {[0, 1, 2].map((index) => (
+        <RhythmPad key={index} index={index} active={active} complete={complete} />
+      ))}
+      <SoundRipple active={complete} color="#fff0a8" offset={0.3} />
+    </group>
+  );
+}
+
+function GuitarCloudMesh({ complete, active }) {
+  const guitar = useRef(null);
+
+  useFrame((state) => {
+    if (!guitar.current) return;
+    guitar.current.rotation.z = -0.24 + Math.sin(state.clock.elapsedTime * (complete ? 4.4 : 1.2)) * (complete ? 0.08 : 0.025);
+    guitar.current.position.x = complete ? 0.1 : -0.1;
+  });
+
+  return (
+    <group>
+      <mesh position={[complete ? -0.48 : -0.18, 0.52, 0]} rotation={[0, 0, 0.14]} scale={[0.18, 0.68, 0.04]}>
+        <boxGeometry args={[1, 1, 1]} />
+        <meshStandardMaterial color="#d86eb8" emissive={active || complete ? "#ff83c6" : "#481a56"} emissiveIntensity={active || complete ? 0.42 : 0.1} />
+      </mesh>
+      <mesh position={[complete ? 0.48 : 0.18, 0.52, 0]} rotation={[0, 0, -0.14]} scale={[0.18, 0.68, 0.04]}>
+        <boxGeometry args={[1, 1, 1]} />
+        <meshStandardMaterial color="#d86eb8" emissive={active || complete ? "#ff83c6" : "#481a56"} emissiveIntensity={active || complete ? 0.42 : 0.1} />
+      </mesh>
+      <group ref={guitar} position={[0, 0.38, 0.06]} rotation={[0, 0, -0.24]}>
+        <CloudPuff position={[-0.12, 0, 0]} scale={0.42} opacity={0.78} />
+        <mesh position={[0.08, 0.05, 0.03]} scale={[0.2, 0.24, 0.06]}>
+          <sphereGeometry args={[1, 18, 12]} />
+          <meshStandardMaterial color="#f6fbff" emissive={complete ? "#fff0a8" : active ? "#ffd0ed" : "#bac8df"} emissiveIntensity={complete ? 0.65 : active ? 0.32 : 0.08} roughness={0.62} />
+        </mesh>
+        <mesh position={[0.38, 0.17, 0.03]} rotation={[0, 0, -0.75]} scale={[0.06, 0.54, 0.04]}>
+          <cylinderGeometry args={[1, 1, 1, 8]} />
+          <meshStandardMaterial color="#ffe4a8" emissive="#ffd45c" emissiveIntensity={active || complete ? 0.4 : 0.08} />
+        </mesh>
+        {[-0.04, 0.02, 0.08].map((y) => (
+          <mesh key={y} position={[0.18, y, 0.1]} rotation={[0, 0, -0.75]} scale={[0.008, 0.62, 0.008]}>
+            <cylinderGeometry args={[1, 1, 1, 6]} />
+            <meshBasicMaterial color="#74fff6" transparent opacity={active || complete ? 0.82 : 0.28} />
+          </mesh>
+        ))}
+      </group>
+    </group>
+  );
+}
+
+function ThunderPuffMesh({ complete, active }) {
+  const group = useRef(null);
+
+  useFrame((state) => {
+    if (!group.current) return;
+    group.current.position.x += ((complete ? 0.22 : -0.2) - group.current.position.x) * 0.05;
+    group.current.position.y = 0.24 + Math.sin(state.clock.elapsedTime * 1.8) * (active || complete ? 0.045 : 0.015);
+  });
+
+  return (
+    <group ref={group} position={[-0.2, 0.24, 0]}>
+      <CloudPuff position={[0, 0, 0]} scale={0.52} opacity={0.86} />
+      <mesh position={[0, 0.02, 0]} scale={[0.38, 0.28, 0.26]}>
+        <sphereGeometry args={[1, 18, 12]} />
+        <meshStandardMaterial color="#b180ff" emissive={complete ? "#ffd0ed" : active ? "#b180ff" : "#3e2b67"} emissiveIntensity={complete ? 0.78 : active ? 0.45 : 0.12} roughness={0.64} />
+      </mesh>
+      <mesh position={[-0.08, 0.1, 0.24]} scale={[0.025, 0.025, 0.025]}>
+        <sphereGeometry args={[1, 8, 8]} />
+        <meshBasicMaterial color="#2a244c" />
+      </mesh>
+      <mesh position={[0.08, 0.1, 0.24]} scale={[0.025, 0.025, 0.025]}>
+        <sphereGeometry args={[1, 8, 8]} />
+        <meshBasicMaterial color="#2a244c" />
+      </mesh>
+      {complete ? (
+        <mesh position={[0, 0.02, 0.25]} scale={[0.08, 0.018, 0.014]}>
+          <sphereGeometry args={[1, 10, 8]} />
+          <meshBasicMaterial color="#2a244c" />
+        </mesh>
+      ) : null}
+      <mesh position={[0.17, -0.1, 0.06]} rotation={[0, 0, -0.2]} scale={[0.08, 0.18, 0.035]}>
+        <coneGeometry args={[1, 1, 3]} />
+        <meshStandardMaterial color="#fff0a8" emissive="#ffd45c" emissiveIntensity={active || complete ? 0.9 : 0.24} />
+      </mesh>
+    </group>
+  );
+}
+
+function CurtainStarMesh({ complete, active }) {
+  const star = useRef(null);
+
+  useFrame((state) => {
+    if (!star.current) return;
+    star.current.rotation.y += complete ? 0.035 : active ? 0.018 : 0.006;
+    star.current.position.y = 0.52 + Math.sin(state.clock.elapsedTime * 2.1) * (active || complete ? 0.06 : 0.018);
+  });
+
+  return (
+    <group>
+      <mesh ref={star} position={[0, 0.52, 0]} scale={[0.18, 0.18, 0.07]}>
+        <octahedronGeometry args={[1, 0]} />
+        <meshStandardMaterial color="#fff0a8" emissive="#ffd45c" emissiveIntensity={complete ? 1.6 : active ? 1 : 0.36} />
+      </mesh>
+      <RhythmConfetti active={complete} color="#ffd0ed" count={18} radius={0.86} />
+    </group>
+  );
+}
+
+function ThunderDrumModel({ complete, active, scale = 1 }) {
+  const group = useRef(null);
+
+  useFrame((state) => {
+    if (!group.current) return;
+    const beat = active || complete ? Math.max(0, Math.sin(state.clock.elapsedTime * 4.8)) : 0;
+    group.current.scale.setScalar(scale * (1 + beat * 0.045));
+    group.current.rotation.y += complete ? 0.01 : active ? 0.004 : 0.001;
+  });
+
+  return (
+    <group ref={group} scale={scale}>
+      <SoundRipple active={complete} color="#b180ff" offset={0.1} />
+      <SoundRipple active={complete} color="#fff0a8" offset={0.45} />
+      <mesh rotation={[Math.PI / 2, 0, 0]} scale={[0.44, 0.44, 0.22]}>
+        <cylinderGeometry args={[1, 1, 1, 36]} />
+        <meshStandardMaterial color="#b180ff" emissive={active || complete ? "#ff83c6" : "#3a2658"} emissiveIntensity={complete ? 0.82 : active ? 0.5 : 0.12} roughness={0.48} />
+      </mesh>
+      <mesh position={[0, 0, 0.24]} rotation={[Math.PI / 2, 0, 0]} scale={[0.4, 0.4, 0.04]}>
+        <cylinderGeometry args={[1, 1, 1, 36]} />
+        <meshStandardMaterial color="#fff0a8" emissive="#ffd45c" emissiveIntensity={complete ? 0.95 : active ? 0.5 : 0.14} roughness={0.36} />
+      </mesh>
+      <mesh position={[0, 0, -0.24]} rotation={[Math.PI / 2, 0, 0]} scale={[0.4, 0.4, 0.04]}>
+        <cylinderGeometry args={[1, 1, 1, 36]} />
+        <meshStandardMaterial color="#ffd0ed" emissive="#ff83c6" emissiveIntensity={complete ? 0.72 : active ? 0.36 : 0.1} roughness={0.36} />
+      </mesh>
+      {[-0.24, 0.24].map((x) => (
+        <mesh key={x} position={[x, 0.04, 0.3]} rotation={[0, 0, x > 0 ? -0.4 : 0.4]} scale={[0.05, 0.2, 0.03]}>
+          <coneGeometry args={[1, 1, 3]} />
+          <meshStandardMaterial color="#74fff6" emissive="#74fff6" emissiveIntensity={active || complete ? 0.8 : 0.2} />
+        </mesh>
+      ))}
+      <CloudPuff position={[0, -0.42, 0]} scale={0.42} opacity={0.64} />
+    </group>
+  );
+}
+
+function MusicalWindGateMesh({ complete, active }) {
+  return (
+    <group>
+      <mesh position={[-0.32, 0.34, 0]} scale={[0.07, 0.68, 0.07]}>
+        <cylinderGeometry args={[1, 1, 1, 12]} />
+        <meshStandardMaterial color="#74fff6" emissive="#74fff6" emissiveIntensity={active || complete ? 0.64 : 0.16} roughness={0.34} />
+      </mesh>
+      <mesh position={[0.32, 0.34, 0]} scale={[0.07, 0.68, 0.07]}>
+        <cylinderGeometry args={[1, 1, 1, 12]} />
+        <meshStandardMaterial color="#ffd0ed" emissive="#ff83c6" emissiveIntensity={active || complete ? 0.64 : 0.16} roughness={0.34} />
+      </mesh>
+      <mesh position={[0, 0.72, 0]} rotation={[0, 0, Math.PI]} scale={[1, 1, 1]}>
+        <torusGeometry args={[0.34, 0.04, 12, 40, Math.PI]} />
+        <meshStandardMaterial color="#fff0a8" emissive="#ffd45c" emissiveIntensity={active || complete ? 0.82 : 0.2} />
+      </mesh>
+      <WindRibbon active={active || complete} complete={complete} color={complete ? "#74fff6" : "#fff0a8"} />
+      <MusicNotes active={complete} color="#fff0a8" count={8} radius={0.72} />
+    </group>
+  );
+}
+
+function RhythmObject({ objectKey, position, active, complete }) {
+  const group = useRef(null);
+  usePulse(group, active, 4.6, 0.048);
+  const glow = complete ? "#ffd45c" : active ? "#fff0a8" : "#ff83c6";
+
+  useFrame((state) => {
+    if (!group.current) return;
+    group.current.position.y = position[1] + Math.sin(state.clock.elapsedTime * 1.48 + position[0]) * 0.024;
+    if (complete && objectKey !== "rhythm-pads") group.current.rotation.y += 0.0045;
+  });
+
+  return (
+    <group ref={group} position={position}>
+      <ActiveObjectAura active={active} complete={complete} color={glow} intensity={1.45} distance={2.5} />
+      {objectKey === "stage-lights" ? <StageLightsMesh complete={complete} active={active} /> : null}
+      {objectKey === "glowing-microphone" ? <MicrophoneMesh complete={complete} active={active} /> : null}
+      {objectKey === "rhythm-pads" ? <RhythmPadsMesh complete={complete} active={active} /> : null}
+      {objectKey === "guitar-cloud" ? <GuitarCloudMesh complete={complete} active={active} /> : null}
+      {objectKey === "thunder-puff" ? <ThunderPuffMesh complete={complete} active={active} /> : null}
+      {objectKey === "curtain-star" ? <CurtainStarMesh complete={complete} active={active} /> : null}
+      {objectKey === "thunder-drum" ? <ThunderDrumModel complete={complete} active={active} /> : null}
+      {objectKey === "musical-wind-gate" ? <MusicalWindGateMesh complete={complete} active={active} /> : null}
+    </group>
+  );
+}
+
+function RhythmCloudStageScene({ level, activeTask, completedTaskIds, voiceActivity, rewardEvent }) {
+  const completed = new Set(completedTaskIds || []);
+  const objectPositions = {
+    "stage-lights": [-1.78, 1.04, -0.86],
+    "glowing-microphone": [-0.82, 0.34, 0.1],
+    "rhythm-pads": [-0.04, 0.24, 0.82],
+    "guitar-cloud": [0.78, 0.44, -0.78],
+    "thunder-puff": [1.36, 0.36, 0.3],
+    "curtain-star": [0.12, 1.12, -1.02],
+    "thunder-drum": [1.96, 0.38, -0.3],
+    "musical-wind-gate": [2.76, 0.5, 0.84]
+  };
+  const stageAwake = completed.size > 0 || voiceActivity === "listening" || voiceActivity === "fallback";
+
+  return (
+    <>
+      <FloatingClouds voiceActivity={voiceActivity} />
+      <group position={[0, -0.5, 0]} rotation={[0, -0.1, 0]}>
+        <CloudPuff position={[-1.8, -0.04, 0.92]} scale={1.2} opacity={0.52} />
+        <CloudPuff position={[1.65, -0.07, -0.95]} scale={1.12} opacity={0.5} />
+        <CloudPuff position={[2.78, -0.02, 0.92]} scale={0.78} opacity={0.48} />
+        <mesh receiveShadow scale={[2.9, 0.3, 1.52]}>
+          <dodecahedronGeometry args={[1, 0]} />
+          <meshStandardMaterial color="#9b68f0" emissive="#ff83c6" emissiveIntensity={0.12 + completed.size * 0.014} roughness={0.72} metalness={0.04} />
+        </mesh>
+        <mesh position={[0, 0.23, 0]} rotation={[Math.PI / 2, 0, 0]} scale={[1.95, 1.08, 1]}>
+          <torusGeometry args={[0.66, 0.034, 8, 52]} />
+          <meshBasicMaterial color="#ffd0ed" transparent opacity={0.46} depthWrite={false} />
+        </mesh>
+        <mesh position={[0.05, 0.29, 0.04]} scale={[1.78, 0.06, 0.88]}>
+          <boxGeometry args={[1, 1, 1]} />
+          <meshStandardMaterial color="#5947b4" emissive={stageAwake ? "#ff83c6" : "#22195d"} emissiveIntensity={stageAwake ? 0.28 : 0.08} roughness={0.54} />
+        </mesh>
+        <mesh position={[0.05, 0.35, 0.04]} scale={[1.68, 0.018, 0.78]}>
+          <boxGeometry args={[1, 1, 1]} />
+          <meshStandardMaterial color="#2de0d4" emissive="#74fff6" emissiveIntensity={stageAwake ? 0.32 : 0.08} transparent opacity={0.82} />
+        </mesh>
+        <mesh position={[0.02, 0.82, -1.08]} scale={[1.72, 0.05, 0.05]}>
+          <boxGeometry args={[1, 1, 1]} />
+          <meshStandardMaterial color="#fff0a8" emissive="#ffd45c" emissiveIntensity={completed.has("turn-on-the-stage-lights") ? 0.72 : 0.16} />
+        </mesh>
+        <mesh position={[-0.88, 0.56, -1.04]} rotation={[0, 0, 0.08]} scale={[0.2, 0.76, 0.04]}>
+          <boxGeometry args={[1, 1, 1]} />
+          <meshStandardMaterial color="#d86eb8" emissive="#ff83c6" emissiveIntensity={completed.has("find-the-guitar-cloud") ? 0.42 : 0.14} />
+        </mesh>
+        <mesh position={[0.88, 0.56, -1.04]} rotation={[0, 0, -0.08]} scale={[0.2, 0.76, 0.04]}>
+          <boxGeometry args={[1, 1, 1]} />
+          <meshStandardMaterial color="#d86eb8" emissive="#ff83c6" emissiveIntensity={completed.has("find-the-guitar-cloud") ? 0.42 : 0.14} />
+        </mesh>
+        <BouncingSpeaker position={[-2.02, 0.55, 0.38]} active={stageAwake} side={-1} />
+        <BouncingSpeaker position={[2.02, 0.55, 0.38]} active={stageAwake} side={1} />
+        <MusicNotes active={stageAwake} color="#fff0a8" count={14} radius={1.48} />
+        <RhythmConfetti active={completed.has("start-the-tiny-show")} color="#ffd0ed" count={18} radius={1.08} />
+        {completed.has("play-the-thunder-drum") ? (
+          <group position={[2.16, 0.56, 0.2]} scale={1.15}>
+            <SoundRipple active color="#b180ff" offset={0.12} />
+            <SoundRipple active color="#74fff6" offset={0.52} />
+          </group>
+        ) : null}
+        {completed.has("sing-to-the-wind-gate") ? (
+          <group position={[2.28, 0.72, 0.88]} scale={1.2}>
+            <MusicNotes active color="#fff0a8" count={12} radius={0.82} />
+            <SparkleCluster active color="#74fff6" count={12} radius={0.88} />
+          </group>
+        ) : null}
+        {level.tasks.map((task) => (
+          <RhythmObject
+            key={task.id}
+            objectKey={task.objectKey}
+            position={objectPositions[task.objectKey] || [0, 0.26, 0]}
+            active={activeTask?.id === task.id}
+            complete={completed.has(task.id)}
+          />
+        ))}
+      </group>
+      {rewardEvent ? <CloudCompassReward rewardEvent={rewardEvent} /> : null}
+    </>
+  );
+}
+
+function RedBusTicketModel({ complete, active, scale = 1 }) {
+  const group = useRef(null);
+
+  useFrame((state) => {
+    if (!group.current) return;
+    const lively = active || complete;
+    group.current.rotation.y += complete ? 0.012 : active ? 0.006 : 0.001;
+    group.current.position.y = Math.sin(state.clock.elapsedTime * 1.8) * (lively ? 0.035 : 0.01);
+  });
+
+  return (
+    <group ref={group} scale={scale}>
+      <mesh rotation={[0, 0, -0.04]} scale={[0.56, 0.32, 0.035]}>
+        <boxGeometry args={[1, 1, 1]} />
+        <meshStandardMaterial color="#e8424f" emissive={active || complete ? "#ff6b6b" : "#6d1e24"} emissiveIntensity={complete ? 0.82 : active ? 0.46 : 0.12} roughness={0.48} />
+      </mesh>
+      <mesh position={[0, 0, 0.04]} rotation={[0, 0, -0.04]} scale={[0.42, 0.08, 0.02]}>
+        <boxGeometry args={[1, 1, 1]} />
+        <meshStandardMaterial color="#fff6df" emissive="#ffd45c" emissiveIntensity={active || complete ? 0.34 : 0.08} roughness={0.5} />
+      </mesh>
+      <mesh position={[0.22, 0.01, 0.07]} rotation={[0, 0, 0.2]} scale={[0.085, 0.085, 0.03]}>
+        <octahedronGeometry args={[1, 0]} />
+        <meshStandardMaterial color="#fff0a8" emissive="#ffd45c" emissiveIntensity={complete ? 1.25 : active ? 0.72 : 0.28} />
+      </mesh>
+      {[-0.36, 0.36].map((x) => (
+        <mesh key={x} position={[x, 0, 0.06]} scale={[0.04, 0.04, 0.02]}>
+          <sphereGeometry args={[1, 10, 8]} />
+          <meshStandardMaterial color="#ffe6c6" emissive="#ffd45c" emissiveIntensity={complete ? 0.36 : 0.08} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+function LondonWindowMesh({ complete, active }) {
+  return (
+    <group>
+      <mesh scale={[0.54, 0.54, 0.06]}>
+        <torusGeometry args={[1, 0.08, 14, 52]} />
+        <meshStandardMaterial color="#fff6df" emissive={active || complete ? "#ffd45c" : "#8e9daa"} emissiveIntensity={complete ? 0.54 : active ? 0.34 : 0.1} roughness={0.38} />
+      </mesh>
+      <mesh scale={[0.46, 0.46, 0.025]}>
+        <cylinderGeometry args={[1, 1, 1, 36]} />
+        <meshStandardMaterial color={complete ? "#9ddcff" : "#d9e1e8"} emissive={complete ? "#baf6ff" : active ? "#cfe3ee" : "#6f7f8c"} emissiveIntensity={complete ? 0.5 : active ? 0.18 : 0.06} transparent opacity={complete ? 0.72 : 0.88} roughness={0.32} />
+      </mesh>
+      {[-0.22, -0.06, 0.1, 0.26].map((x, index) => (
+        <mesh key={x} position={[x, -0.12 + index * 0.04, 0.05]} scale={[0.08, 0.2 + index * 0.05, 0.035]}>
+          <boxGeometry args={[1, 1, 1]} />
+          <meshStandardMaterial color="#5d6d86" emissive={complete ? "#ffd45c" : "#4d596a"} emissiveIntensity={complete ? 0.24 : 0.04} transparent opacity={complete ? 0.86 : 0.24} />
+        </mesh>
+      ))}
+      {!complete ? (
+        <>
+          <CloudPuff position={[-0.06, 0.02, 0.08]} scale={0.5} opacity={active ? 0.58 : 0.72} />
+          <CloudPuff position={[0.18, -0.08, 0.1]} scale={0.36} opacity={active ? 0.5 : 0.66} />
+        </>
+      ) : (
+        <SparkleCluster active color="#fff0a8" count={9} radius={0.48} />
+      )}
+    </group>
+  );
+}
+
+function BigBenTowerMesh({ complete, active }) {
+  const hand = useRef(null);
+
+  useFrame((state) => {
+    if (!hand.current) return;
+    hand.current.rotation.z = complete ? state.clock.elapsedTime * 2.1 : Math.sin(state.clock.elapsedTime * 1.2) * 0.18;
+  });
+
+  return (
+    <group>
+      <mesh position={[0, 0.26, 0]} scale={[0.24, 0.54, 0.2]}>
+        <boxGeometry args={[1, 1, 1]} />
+        <meshStandardMaterial color="#d9d0bc" emissive={active || complete ? "#ffd45c" : "#83796a"} emissiveIntensity={complete ? 0.36 : active ? 0.2 : 0.06} roughness={0.62} />
+      </mesh>
+      <mesh position={[0, 0.78, 0]} scale={[0.2, 0.22, 0.16]}>
+        <coneGeometry args={[1, 1, 4]} />
+        <meshStandardMaterial color="#b7a77e" emissive={complete ? "#ffd45c" : "#6e633f"} emissiveIntensity={complete ? 0.34 : 0.08} roughness={0.5} />
+      </mesh>
+      <mesh position={[0, 0.48, 0.12]} scale={[0.16, 0.16, 0.025]}>
+        <cylinderGeometry args={[1, 1, 1, 32]} />
+        <meshStandardMaterial color="#fff6df" emissive={active || complete ? "#fff0a8" : "#8b846e"} emissiveIntensity={complete ? 0.6 : active ? 0.34 : 0.08} roughness={0.32} />
+      </mesh>
+      <mesh ref={hand} position={[0, 0.48, 0.15]} scale={[0.018, 0.13, 0.018]}>
+        <boxGeometry args={[1, 1, 1]} />
+        <meshBasicMaterial color="#4a3f3d" />
+      </mesh>
+      <mesh position={[0.05, 0.5, 0.16]} rotation={[0, 0, complete ? -0.7 : 0.2]} scale={[0.014, 0.08, 0.014]}>
+        <boxGeometry args={[1, 1, 1]} />
+        <meshBasicMaterial color="#4a3f3d" />
+      </mesh>
+      {!complete ? (
+        <>
+          <mesh position={[-0.05, 0.54, 0.16]} rotation={[0, 0, 0.35]} scale={[0.04, 0.01, 0.01]}>
+            <boxGeometry args={[1, 1, 1]} />
+            <meshBasicMaterial color="#4a3f3d" />
+          </mesh>
+          <mesh position={[0.05, 0.54, 0.16]} rotation={[0, 0, -0.35]} scale={[0.04, 0.01, 0.01]}>
+            <boxGeometry args={[1, 1, 1]} />
+            <meshBasicMaterial color="#4a3f3d" />
+          </mesh>
+        </>
+      ) : (
+        <SoundRipple active color="#ffd45c" offset={0.22} />
+      )}
+      {[-0.08, 0.08].map((x) => (
+        <mesh key={x} position={[x, 0.2, 0.12]} scale={[0.04, 0.08, 0.02]}>
+          <boxGeometry args={[1, 1, 1]} />
+          <meshStandardMaterial color="#92d7ff" emissive="#baf6ff" emissiveIntensity={complete ? 0.28 : 0.06} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+function RedBusCloudMesh({ complete, active }) {
+  const bus = useRef(null);
+
+  useFrame((state) => {
+    if (!bus.current) return;
+    bus.current.position.x = complete ? 0.12 + Math.sin(state.clock.elapsedTime * 1.8) * 0.025 : 0;
+    bus.current.position.y = 0.3 + Math.sin(state.clock.elapsedTime * 1.4) * (active || complete ? 0.035 : 0.012);
+  });
+
+  return (
+    <group ref={bus} position={[0, 0.3, 0]}>
+      <CloudPuff position={[0, -0.18, -0.02]} scale={0.58} opacity={0.62} />
+      <mesh position={[0, 0.02, 0]} scale={[0.62, 0.22, 0.18]}>
+        <boxGeometry args={[1, 1, 1]} />
+        <meshStandardMaterial color="#e8424f" emissive={active || complete ? "#ff6b6b" : "#6d1e24"} emissiveIntensity={complete ? 0.52 : active ? 0.3 : 0.08} roughness={0.48} />
+      </mesh>
+      <mesh position={[-0.08, 0.18, 0]} scale={[0.36, 0.2, 0.16]}>
+        <boxGeometry args={[1, 1, 1]} />
+        <meshStandardMaterial color="#f24f58" emissive={active || complete ? "#ff6b6b" : "#6d1e24"} emissiveIntensity={complete ? 0.45 : active ? 0.24 : 0.07} roughness={0.5} />
+      </mesh>
+      {[-0.26, -0.06, 0.16].map((x) => (
+        <mesh key={x} position={[x, 0.2, 0.1]} scale={[0.08, 0.07, 0.02]}>
+          <boxGeometry args={[1, 1, 1]} />
+          <meshStandardMaterial color="#dff7ff" emissive="#baf6ff" emissiveIntensity={active || complete ? 0.42 : 0.1} roughness={0.3} />
+        </mesh>
+      ))}
+      <CloudPuff position={[-0.26, -0.16, 0.08]} scale={0.2} opacity={0.9} />
+      {complete ? (
+        <CloudPuff position={[0.28, -0.16, 0.08]} scale={0.2} opacity={0.9} />
+      ) : (
+        <mesh position={[0.28, -0.16, 0.08]} scale={[0.13, 0.13, 0.02]}>
+          <torusGeometry args={[1, 0.12, 8, 24]} />
+          <meshBasicMaterial color="#d5dde4" transparent opacity={active ? 0.45 : 0.2} depthWrite={false} />
+        </mesh>
+      )}
+    </group>
+  );
+}
+
+function TicketBoothMesh({ complete, active }) {
+  return (
+    <group>
+      {!complete ? <WindRibbon active={active} complete={false} color="#d9e8ef" /> : null}
+      <mesh position={[0, 0.28, 0]} scale={[0.34, 0.46, 0.22]}>
+        <boxGeometry args={[1, 1, 1]} />
+        <meshStandardMaterial color="#fff6df" emissive={active || complete ? "#ffd45c" : "#9b8760"} emissiveIntensity={complete ? 0.36 : active ? 0.2 : 0.06} roughness={0.58} />
+      </mesh>
+      <mesh position={[0, 0.55, 0]} scale={[0.42, 0.08, 0.27]}>
+        <boxGeometry args={[1, 1, 1]} />
+        <meshStandardMaterial color="#e8424f" emissive={complete ? "#ff6b6b" : "#7d2528"} emissiveIntensity={complete ? 0.54 : active ? 0.26 : 0.08} roughness={0.5} />
+      </mesh>
+      <mesh position={[complete ? 0.14 : 0, 0.25, 0.13]} rotation={[0, complete ? -0.45 : 0, 0]} scale={[0.13, 0.25, 0.02]}>
+        <boxGeometry args={[1, 1, 1]} />
+        <meshStandardMaterial color="#7ccaf2" emissive="#baf6ff" emissiveIntensity={complete ? 0.45 : active ? 0.2 : 0.06} roughness={0.32} />
+      </mesh>
+      {(active || complete) ? (
+        <group position={[0.16, 0.18, 0.22]} scale={0.56}>
+          <RedBusTicketModel complete={complete} active={active} />
+        </group>
+      ) : null}
+    </group>
+  );
+}
+
+function GateArrow({ direction = "left", lit }) {
+  const sign = direction === "left" ? -1 : 1;
+  return (
+    <group position={[sign * 0.26, 0.24, 0]} rotation={[0, 0, sign > 0 ? -Math.PI / 2 : Math.PI / 2]}>
+      <mesh position={[0, -0.08, 0]} scale={[0.055, 0.34, 0.04]}>
+        <boxGeometry args={[1, 1, 1]} />
+        <meshStandardMaterial color={lit ? "#ffd45c" : "#d7dee5"} emissive={lit ? "#ffd45c" : "#7b8894"} emissiveIntensity={lit ? 0.85 : 0.12} roughness={0.4} />
+      </mesh>
+      <mesh position={[0, 0.16, 0]} scale={[0.12, 0.22, 0.06]}>
+        <coneGeometry args={[1, 1, 3]} />
+        <meshStandardMaterial color={lit ? "#fff0a8" : "#c9d2da"} emissive={lit ? "#ffd45c" : "#7b8894"} emissiveIntensity={lit ? 0.95 : 0.12} roughness={0.4} />
+      </mesh>
+    </group>
+  );
+}
+
+function WindArrowsMesh({ complete, active }) {
+  const sign = useRef(null);
+
+  useFrame((state) => {
+    if (!sign.current) return;
+    sign.current.rotation.y = complete ? -0.28 + Math.sin(state.clock.elapsedTime * 1.8) * 0.04 : Math.sin(state.clock.elapsedTime * 1.2) * 0.12;
+  });
+
+  return (
+    <group ref={sign}>
+      <mesh position={[0, 0.12, 0]} scale={[0.82, 0.12, 0.08]}>
+        <boxGeometry args={[1, 1, 1]} />
+        <meshStandardMaterial color="#fff6df" emissive={active || complete ? "#ffd45c" : "#8f886d"} emissiveIntensity={active || complete ? 0.28 : 0.08} roughness={0.5} />
+      </mesh>
+      <GateArrow direction="left" lit={complete || active} />
+      <GateArrow direction="right" lit={active && !complete} />
+      <WindRibbon active={active || complete} complete={complete} color={complete ? "#ffd45c" : "#baf6ff"} />
+    </group>
+  );
+}
+
+function RiverRibbonMesh({ complete, active }) {
+  const river = useRef(null);
+
+  useFrame((state) => {
+    if (!river.current) return;
+    river.current.rotation.z = Math.sin(state.clock.elapsedTime * 1.8) * 0.045;
+    river.current.position.y = 0.1 + Math.sin(state.clock.elapsedTime * 1.2) * 0.018;
+  });
+
+  return (
+    <group>
+      <mesh ref={river} position={[0, 0.1, 0]} scale={[1.08, 0.045, 0.26]}>
+        <boxGeometry args={[1, 1, 1]} />
+        <meshStandardMaterial color="#52bfff" emissive={active || complete ? "#baf6ff" : "#276b93"} emissiveIntensity={complete ? 0.56 : active ? 0.32 : 0.12} transparent opacity={0.84} roughness={0.34} />
+      </mesh>
+      {complete ? (
+        <>
+          <CloudPuff position={[-0.28, 0.22, 0]} scale={0.34} opacity={0.82} />
+          <CloudPuff position={[0.03, 0.24, 0]} scale={0.34} opacity={0.84} />
+          <CloudPuff position={[0.34, 0.22, 0]} scale={0.34} opacity={0.82} />
+          <SparkleCluster active color="#baf6ff" count={8} radius={0.62} />
+        </>
+      ) : null}
+    </group>
+  );
+}
+
+function TicketStampMesh({ complete, active }) {
+  const stamp = useRef(null);
+
+  useFrame((state) => {
+    if (!stamp.current) return;
+    const targetY = complete ? 0.36 : active ? 0.58 + Math.sin(state.clock.elapsedTime * 3.2) * 0.05 : 0.62;
+    stamp.current.position.y += (targetY - stamp.current.position.y) * 0.1;
+    stamp.current.rotation.z = Math.sin(state.clock.elapsedTime * 1.3) * 0.04;
+  });
+
+  return (
+    <group>
+      <group position={[0, 0.12, 0]} scale={0.72}>
+        <RedBusTicketModel complete={complete} active={active} />
+      </group>
+      <mesh position={[0, 0.32, -0.02]} scale={[0.44, 0.06, 0.22]}>
+        <boxGeometry args={[1, 1, 1]} />
+        <meshStandardMaterial color="#d9d0bc" emissive={active || complete ? "#ffd45c" : "#756b5a"} emissiveIntensity={active || complete ? 0.24 : 0.06} roughness={0.55} />
+      </mesh>
+      <group ref={stamp} position={[0, 0.62, 0.04]}>
+        <mesh scale={[0.08, 0.26, 0.08]}>
+          <cylinderGeometry args={[1, 1, 1, 12]} />
+          <meshStandardMaterial color="#fff6df" emissive={active || complete ? "#ffd45c" : "#80735a"} emissiveIntensity={active || complete ? 0.32 : 0.06} />
+        </mesh>
+        <mesh position={[0, -0.18, 0]} scale={[0.16, 0.06, 0.16]}>
+          <cylinderGeometry args={[1, 1, 1, 18]} />
+          <meshStandardMaterial color="#e8424f" emissive={complete ? "#ff6b6b" : "#7b2026"} emissiveIntensity={complete ? 0.5 : active ? 0.26 : 0.08} />
+        </mesh>
+        <mesh position={[0, -0.23, 0.03]} scale={[0.08, 0.08, 0.03]}>
+          <octahedronGeometry args={[1, 0]} />
+          <meshStandardMaterial color="#fff0a8" emissive="#ffd45c" emissiveIntensity={complete ? 1.35 : active ? 0.85 : 0.3} />
+        </mesh>
+      </group>
+      {complete ? <SparkleCluster active color="#ffd45c" count={10} radius={0.58} /> : null}
+    </group>
+  );
+}
+
+function LondonWindGateMesh({ complete, active }) {
+  const left = useRef(null);
+  const right = useRef(null);
+
+  useFrame((state) => {
+    if (left.current) {
+      left.current.position.x += ((complete ? -0.42 : -0.26) - left.current.position.x) * 0.08;
+      left.current.rotation.z = complete ? -0.12 : Math.sin(state.clock.elapsedTime * 1.1) * 0.03;
+    }
+    if (right.current) {
+      right.current.position.x += ((complete ? 0.42 : 0.26) - right.current.position.x) * 0.08;
+      right.current.rotation.z = complete ? 0.12 : Math.sin(state.clock.elapsedTime * 1.1) * -0.03;
+    }
+  });
+
+  return (
+    <group>
+      <group ref={left} position={[-0.26, 0.42, 0]}>
+        <mesh scale={[0.08, 0.74, 0.08]}>
+          <boxGeometry args={[1, 1, 1]} />
+          <meshStandardMaterial color="#fff6df" emissive={active || complete ? "#ffd45c" : "#8f8265"} emissiveIntensity={complete ? 0.54 : active ? 0.28 : 0.08} roughness={0.44} />
+        </mesh>
+      </group>
+      <group ref={right} position={[0.26, 0.42, 0]}>
+        <mesh scale={[0.08, 0.74, 0.08]}>
+          <boxGeometry args={[1, 1, 1]} />
+          <meshStandardMaterial color="#fff6df" emissive={active || complete ? "#ffd45c" : "#8f8265"} emissiveIntensity={complete ? 0.54 : active ? 0.28 : 0.08} roughness={0.44} />
+        </mesh>
+      </group>
+      <mesh position={[0, 0.78, 0]} rotation={[0, 0, Math.PI]} scale={[1, 1, 1]}>
+        <torusGeometry args={[0.38, 0.05, 12, 42, Math.PI]} />
+        <meshStandardMaterial color="#e8424f" emissive={active || complete ? "#ff6b6b" : "#6d1e24"} emissiveIntensity={complete ? 0.82 : active ? 0.44 : 0.12} roughness={0.36} />
+      </mesh>
+      <mesh position={[0, 0.28, -0.04]} scale={[0.38, 0.24, 0.025]}>
+        <torusGeometry args={[1, 0.08, 10, 38]} />
+        <meshBasicMaterial color="#baf6ff" transparent opacity={active || complete ? 0.48 : 0.16} depthWrite={false} />
+      </mesh>
+      <WindRibbon active={active || complete} complete={complete} color={complete ? "#ffd45c" : "#baf6ff"} />
+      {complete ? (
+        <group position={[0, 0.5, -0.28]} scale={0.72}>
+          <mesh position={[0, 0.08, 0]} scale={[0.48, 0.48, 0.48]}>
+            <coneGeometry args={[0.58, 0.94, 5]} />
+            <meshStandardMaterial color="#8b77d8" emissive="#b180ff" emissiveIntensity={0.46} roughness={0.62} />
+          </mesh>
+          <mesh position={[0, 0.58, 0]} scale={[0.22, 0.08, 0.22]}>
+            <cylinderGeometry args={[1, 1, 1, 5]} />
+            <meshStandardMaterial color="#fff0a8" emissive="#ffd45c" emissiveIntensity={0.7} />
+          </mesh>
+          <SparkleCluster active color="#fff0a8" count={10} radius={0.7} />
+        </group>
+      ) : null}
+    </group>
+  );
+}
+
+function LondonObject({ objectKey, position, active, complete }) {
+  const group = useRef(null);
+  usePulse(group, active, 4.3, 0.046);
+  const glow = complete ? "#ffd45c" : active ? "#fff0a8" : "#ff6b6b";
+
+  useFrame((state) => {
+    if (!group.current) return;
+    group.current.position.y = position[1] + Math.sin(state.clock.elapsedTime * 1.38 + position[0]) * 0.023;
+    if (complete && !["river-ribbon", "london-wind-gate"].includes(objectKey)) group.current.rotation.y += 0.004;
+  });
+
+  return (
+    <group ref={group} position={position}>
+      <ActiveObjectAura active={active} complete={complete} color={glow} intensity={1.38} distance={2.55} completeCount={10} />
+      {objectKey === "london-window" ? <LondonWindowMesh complete={complete} active={active} /> : null}
+      {objectKey === "big-ben-tower" ? <BigBenTowerMesh complete={complete} active={active} /> : null}
+      {objectKey === "red-bus-cloud" ? <RedBusCloudMesh complete={complete} active={active} /> : null}
+      {objectKey === "ticket-booth" ? <TicketBoothMesh complete={complete} active={active} /> : null}
+      {objectKey === "wind-arrows" ? <WindArrowsMesh complete={complete} active={active} /> : null}
+      {objectKey === "river-ribbon" ? <RiverRibbonMesh complete={complete} active={active} /> : null}
+      {objectKey === "ticket-stamp" ? <TicketStampMesh complete={complete} active={active} /> : null}
+      {objectKey === "london-wind-gate" ? <LondonWindGateMesh complete={complete} active={active} /> : null}
+    </group>
+  );
+}
+
+function LondonWindGateScene({ level, activeTask, completedTaskIds, voiceActivity, rewardEvent }) {
+  const completed = new Set(completedTaskIds || []);
+  const objectPositions = {
+    "london-window": [-1.92, 0.74, -0.72],
+    "big-ben-tower": [-1.16, 0.48, 0.12],
+    "red-bus-cloud": [-0.42, 0.32, 0.78],
+    "ticket-booth": [0.56, 0.36, -0.66],
+    "wind-arrows": [1.18, 0.52, 0.28],
+    "river-ribbon": [0.28, 0.18, 1.15],
+    "ticket-stamp": [1.84, 0.34, -0.22],
+    "london-wind-gate": [2.66, 0.52, 0.76]
+  };
+  const travelAwake = completed.size > 0 || voiceActivity === "listening" || voiceActivity === "fallback";
+
+  return (
+    <>
+      <FloatingClouds voiceActivity={voiceActivity} />
+      <group position={[0, -0.52, 0]} rotation={[0, -0.1, 0]}>
+        <CloudPuff position={[-1.8, -0.04, 0.95]} scale={1.18} opacity={0.5} />
+        <CloudPuff position={[1.58, -0.08, -0.95]} scale={1.12} opacity={0.46} />
+        <CloudPuff position={[2.78, -0.02, 0.95]} scale={0.78} opacity={0.46} />
+        <mesh receiveShadow scale={[2.96, 0.31, 1.54]}>
+          <dodecahedronGeometry args={[1, 0]} />
+          <meshStandardMaterial color="#d9e1df" emissive={travelAwake ? "#ffd45c" : "#9bb2bd"} emissiveIntensity={travelAwake ? 0.16 + completed.size * 0.012 : 0.06} roughness={0.76} metalness={0.03} />
+        </mesh>
+        <mesh position={[0, 0.22, 0]} rotation={[Math.PI / 2, 0, 0]} scale={[1.98, 1.1, 1]}>
+          <torusGeometry args={[0.68, 0.034, 8, 52]} />
+          <meshBasicMaterial color="#fff6df" transparent opacity={0.46} depthWrite={false} />
+        </mesh>
+        <mesh position={[0.05, 0.29, 0.06]} scale={[1.78, 0.052, 0.86]}>
+          <boxGeometry args={[1, 1, 1]} />
+          <meshStandardMaterial color="#f5edd9" emissive={travelAwake ? "#ffd45c" : "#9c8f73"} emissiveIntensity={travelAwake ? 0.18 : 0.05} roughness={0.6} />
+        </mesh>
+        <mesh position={[0.28, 0.31, 1.06]} rotation={[0, 0, 0.04]} scale={[1.34, 0.035, 0.2]}>
+          <boxGeometry args={[1, 1, 1]} />
+          <meshStandardMaterial color="#52bfff" emissive="#baf6ff" emissiveIntensity={completed.has("cross-the-river-ribbon") ? 0.54 : 0.2} transparent opacity={0.8} roughness={0.34} />
+        </mesh>
+        {[-1.62, -1.28, -0.94, -0.58, -0.2, 0.16].map((x, index) => (
+          <mesh key={x} position={[x, 0.42 + index * 0.025, -1.05]} scale={[0.16, 0.32 + (index % 3) * 0.08, 0.08]}>
+            <boxGeometry args={[1, 1, 1]} />
+            <meshStandardMaterial color="#8d9ba8" emissive={completed.has("open-the-london-window") ? "#ffd45c" : "#4d5a63"} emissiveIntensity={completed.has("open-the-london-window") ? 0.18 : 0.04} transparent opacity={completed.has("open-the-london-window") ? 0.78 : 0.32} />
+          </mesh>
+        ))}
+        {[0.72, 1.18, 1.64].map((x, index) => (
+          <group key={x} position={[x, 0.48 + index * 0.02, -1.02]}>
+            <mesh scale={[0.12, 0.3 + index * 0.06, 0.07]}>
+              <boxGeometry args={[1, 1, 1]} />
+              <meshStandardMaterial color="#b8c4cc" emissive={travelAwake ? "#baf6ff" : "#51636f"} emissiveIntensity={travelAwake ? 0.12 : 0.03} transparent opacity={0.58} />
+            </mesh>
+            {[0.08, -0.02].map((y) => (
+              <mesh key={y} position={[0, y, 0.05]} scale={[0.04, 0.035, 0.02]}>
+                <boxGeometry args={[1, 1, 1]} />
+                <meshStandardMaterial color="#fff0a8" emissive="#ffd45c" emissiveIntensity={travelAwake ? 0.34 : 0.08} />
+              </mesh>
+            ))}
+          </group>
+        ))}
+        <mesh position={[2.92, 0.22, 0.92]} scale={[0.78, 0.11, 0.26]}>
+          <boxGeometry args={[1, 1, 1]} />
+          <meshStandardMaterial color="#fff6df" emissive={completed.has("open-the-wind-gate") ? "#ffd45c" : "#9c8f73"} emissiveIntensity={completed.has("open-the-wind-gate") ? 0.72 : 0.08} roughness={0.44} />
+        </mesh>
+        <group position={[-2.52, 0.52, 0.58]} scale={0.9}>
+          <WindRibbon active={travelAwake} complete={completed.has("turn-left-at-the-gate")} color="#baf6ff" />
+        </group>
+        <group position={[1.96, 0.82, -0.82]} scale={0.8}>
+          <WindRibbon active={travelAwake} complete={completed.has("open-the-wind-gate")} color="#ffd45c" />
+        </group>
+        {completed.has("stamp-the-red-bus-ticket") ? (
+          <group position={[1.6, 0.78, -0.12]} scale={0.92}>
+            <RedBusTicketModel complete active scale={0.76} />
+            <SparkleCluster active color="#ffd45c" count={10} radius={0.72} />
+          </group>
+        ) : null}
+        {completed.has("open-the-wind-gate") ? (
+          <group position={[2.3, 0.72, 0.88]} scale={1.2}>
+            <WindRibbon active complete color="#fff0a8" />
+            <SparkleCluster active color="#b180ff" count={12} radius={0.86} />
+          </group>
+        ) : null}
+        {level.tasks.map((task) => (
+          <LondonObject
+            key={task.id}
+            objectKey={task.objectKey}
+            position={objectPositions[task.objectKey] || [0, 0.26, 0]}
+            active={activeTask?.id === task.id}
+            complete={completed.has(task.id)}
+          />
+        ))}
+      </group>
+      {rewardEvent ? <CloudCompassReward rewardEvent={rewardEvent} /> : null}
+    </>
+  );
+}
+
+function MiniCloudCompassModel({ complete, active, scale = 1 }) {
+  const needle = useRef(null);
+
+  useFrame((state) => {
+    if (!needle.current) return;
+    needle.current.rotation.z = complete ? -0.8 : state.clock.elapsedTime * (active ? 2.2 : 0.9);
+  });
+
+  return (
+    <group scale={scale}>
+      <mesh rotation={[Math.PI / 2, 0, 0]} scale={[0.34, 0.34, 0.05]}>
+        <cylinderGeometry args={[1, 1, 1, 36]} />
+        <meshStandardMaterial color="#ffd45c" emissive={active || complete ? "#fff0a8" : "#7c5d20"} emissiveIntensity={complete ? 0.95 : active ? 0.52 : 0.16} metalness={0.18} roughness={0.32} />
+      </mesh>
+      <mesh rotation={[Math.PI / 2, 0, 0]} scale={[0.39, 0.39, 0.39]}>
+        <torusGeometry args={[0.88, 0.045, 10, 48]} />
+        <meshStandardMaterial color="#fff8d8" emissive="#ffd45c" emissiveIntensity={active || complete ? 0.58 : 0.16} />
+      </mesh>
+      <group ref={needle}>
+        <mesh position={[0, 0.08, 0.05]} rotation={[0, 0, -0.44]} scale={[0.06, 0.34, 0.035]}>
+          <coneGeometry args={[1, 1, 3]} />
+          <meshStandardMaterial color="#52e6ff" emissive="#baf6ff" emissiveIntensity={active || complete ? 1 : 0.28} />
+        </mesh>
+        <mesh position={[0, -0.08, 0.05]} rotation={[0, 0, 2.7]} scale={[0.05, 0.26, 0.03]}>
+          <coneGeometry args={[1, 1, 3]} />
+          <meshStandardMaterial color="#ff83c6" emissive="#ffd0ed" emissiveIntensity={active || complete ? 0.8 : 0.2} />
+        </mesh>
+      </group>
+    </group>
+  );
+}
+
+function MiniSunberryBasketModel({ complete, active, scale = 1 }) {
+  return (
+    <group scale={scale}>
+      <mesh position={[0, 0.08, 0]} scale={[0.34, 0.22, 0.28]}>
+        <sphereGeometry args={[1, 18, 10, 0, Math.PI * 2, 0, Math.PI * 0.66]} />
+        <meshStandardMaterial color="#b87735" emissive={active || complete ? "#ffd45c" : "#6d3b12"} emissiveIntensity={complete ? 0.48 : active ? 0.24 : 0.08} roughness={0.65} />
+      </mesh>
+      <mesh position={[0, 0.28, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[0.25, 0.027, 8, 28, Math.PI]} />
+        <meshStandardMaterial color="#ffe0a0" emissive="#ffd45c" emissiveIntensity={active || complete ? 0.46 : 0.14} />
+      </mesh>
+      {Array.from({ length: 6 }, (_, index) => (
+        <mesh key={index} position={[(index % 3 - 1) * 0.1, 0.23 + Math.floor(index / 3) * 0.08, (Math.floor(index / 3) - 0.5) * 0.09]} scale={[0.06, 0.06, 0.06]}>
+          <sphereGeometry args={[1, 12, 12]} />
+          <meshStandardMaterial color="#ffb23f" emissive="#ffd45c" emissiveIntensity={active || complete ? 0.95 : 0.35} roughness={0.36} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
 function CloudHarborScene({ level, activeTask, completedTaskIds, voiceActivity, rewardEvent }) {
   const completed = new Set(completedTaskIds || []);
   const objectPositions = {
@@ -1091,8 +2585,11 @@ function CloudCompassReward({ rewardEvent }) {
   const [dragging, setDragging] = useState(false);
   const lastPointer = useRef([0, 0]);
   const isSunberryBasket = rewardEvent?.type === "sunberry-basket" || rewardEvent?.label === "Sunberry Basket";
-  const rewardColor = isSunberryBasket ? "#ffcf6d" : "#ffd45c";
-  const rewardGlow = isSunberryBasket ? "#ffb23f" : "#fff0a8";
+  const isStarMapLens = rewardEvent?.type === "star-map-lens" || rewardEvent?.label === "Star Map Lens";
+  const isThunderDrum = rewardEvent?.type === "thunder-drum" || rewardEvent?.label === "Thunder Drum";
+  const isRedBusTicket = rewardEvent?.type === "red-bus-ticket" || rewardEvent?.label === "Red Bus Ticket";
+  const rewardColor = isSunberryBasket ? "#ffcf6d" : isStarMapLens ? "#8a8dff" : isThunderDrum ? "#ff83c6" : isRedBusTicket ? "#ff6b6b" : "#ffd45c";
+  const rewardGlow = isSunberryBasket ? "#ffb23f" : isStarMapLens ? "#baf6ff" : isThunderDrum ? "#fff0a8" : isRedBusTicket ? "#ffd45c" : "#fff0a8";
 
   useFrame((state) => {
     if (!group.current) return;
@@ -1162,6 +2659,25 @@ function CloudCompassReward({ rewardEvent }) {
             </mesh>
           ))}
         </group>
+      ) : isStarMapLens ? (
+        <group scale={1.12}>
+          <StarLensModel complete active scale={1.18} />
+          <mesh position={[0, 0, -0.04]} rotation={[Math.PI / 2, 0, Math.PI / 6]}>
+            <torusGeometry args={[0.48, 0.012, 8, 48]} />
+            <meshBasicMaterial color="#fff0a8" transparent opacity={0.5} depthWrite={false} />
+          </mesh>
+        </group>
+      ) : isThunderDrum ? (
+        <group scale={1.04}>
+          <ThunderDrumModel complete active scale={1.2} />
+          <MusicNotes active color="#fff0a8" count={8} radius={0.78} />
+        </group>
+      ) : isRedBusTicket ? (
+        <group scale={1.16}>
+          <RedBusTicketModel complete active scale={1.28} />
+          <WindRibbon active complete color="#baf6ff" />
+          <SparkleCluster active color="#ffd45c" count={10} radius={0.7} />
+        </group>
       ) : (
         <group>
           <mesh>
@@ -1185,21 +2701,19 @@ function CloudCompassReward({ rewardEvent }) {
   );
 }
 
+const levelSceneRenderers = {
+  "sky-dock": CloudHarborScene,
+  "picnic-island": BreakfastBreezeScene,
+  "star-observatory": SchoolStarObservatoryScene,
+  "cloud-stage": RhythmCloudStageScene,
+  "london-gate": LondonWindGateScene
+};
+
 function LevelScene({ level, activeTask, completedTaskIds, voiceActivity, rewardEvent }) {
-  if (level?.sceneType === "picnic-island") {
-    return (
-      <BreakfastBreezeScene
-        level={level}
-        activeTask={activeTask}
-        completedTaskIds={completedTaskIds}
-        voiceActivity={voiceActivity}
-        rewardEvent={rewardEvent}
-      />
-    );
-  }
+  const Scene = levelSceneRenderers[level?.sceneType] || CloudHarborScene;
 
   return (
-    <CloudHarborScene
+    <Scene
       level={level}
       activeTask={activeTask}
       completedTaskIds={completedTaskIds}
@@ -1233,20 +2747,73 @@ function CameraRig({ mode }) {
   return null;
 }
 
-function BaseScene({ mode, children }) {
+const defaultSceneTheme = {
+  background: "#5fd4ff",
+  fog: ["#a6f0ff", 7, 16],
+  ambient: 1.25,
+  hemi: ["#f8fdff", "#8bdcff", 0.82],
+  sun: 1.85,
+  point: { intensity: 2.2, color: "#ffffff" },
+  starCount: 80,
+  starFactor: 2,
+  starRadius: 18,
+  starSpeed: 0.25
+};
+
+const levelSceneThemes = {
+  "star-observatory": {
+    background: "#14225a",
+    fog: ["#27346c", 6, 17],
+    ambient: 0.82,
+    hemi: ["#cfe9ff", "#17153e", 0.74],
+    sun: 1.32,
+    point: { intensity: 2.8, color: "#baf6ff" },
+    starCount: 180,
+    starFactor: 2.7,
+    starRadius: 22,
+    starSpeed: 0.42
+  },
+  "cloud-stage": {
+    background: "#654ee9",
+    fog: ["#7d64f2", 6, 17],
+    ambient: 1,
+    hemi: ["#fff0ff", "#39246d", 0.82],
+    sun: 1.55,
+    point: { intensity: 2.8, color: "#ffd0ed" },
+    starCount: 120,
+    starFactor: 2.35,
+    starRadius: 22,
+    starSpeed: 0.34
+  },
+  "london-gate": {
+    background: "#85cff5",
+    fog: ["#d8edf2", 6.4, 18],
+    ambient: 1.12,
+    hemi: ["#fff8df", "#9ec8d6", 0.84],
+    sun: 1.62,
+    point: { intensity: 2.45, color: "#ffd45c" },
+    starCount: 70,
+    starFactor: 1.8,
+    starRadius: 18,
+    starSpeed: 0.22
+  }
+};
+
+function BaseScene({ mode, activeLevel, children }) {
+  const theme = mode === "level" ? levelSceneThemes[activeLevel?.sceneType] || defaultSceneTheme : defaultSceneTheme;
   return (
-    <Canvas camera={{ position: [0, 4.2, 7.2], fov: 48 }} dpr={[1, 1.5]} shadows>
+    <Canvas camera={{ position: [0, 4.2, 7.2], fov: 48 }} dpr={[1, 1.5]} shadows={{ type: THREE.PCFShadowMap }}>
       <CameraRig mode={mode} />
-      <color attach="background" args={["#5fd4ff"]} />
-      <fog attach="fog" args={["#a6f0ff", 7, 16]} />
-      <ambientLight intensity={1.25} />
-      <hemisphereLight args={["#f8fdff", "#8bdcff", 0.82]} />
-      <directionalLight position={[3, 6, 5]} intensity={1.85} castShadow />
-      <pointLight position={[0, 2.8, 2]} intensity={2.2} color="#ffffff" />
+      <color attach="background" args={[theme.background]} />
+      <fog attach="fog" args={theme.fog} />
+      <ambientLight intensity={theme.ambient} />
+      <hemisphereLight args={theme.hemi} />
+      <directionalLight position={[3, 6, 5]} intensity={theme.sun} castShadow />
+      <pointLight position={[0, 2.8, 2]} intensity={theme.point.intensity} color={theme.point.color} />
       <CloudPuff position={[-4.2, -1.2, -3.8]} scale={2.2} opacity={0.18} />
       <CloudPuff position={[3.9, -1.05, -4.2]} scale={2.6} opacity={0.16} />
       <CloudPuff position={[0, -1.32, -5.2]} scale={3.1} opacity={0.13} />
-      <Stars radius={18} depth={8} count={80} factor={2} saturation={0} fade speed={0.25} />
+      <Stars radius={theme.starRadius} depth={8} count={theme.starCount} factor={theme.starFactor} saturation={0} fade speed={theme.starSpeed} />
       {children}
     </Canvas>
   );
@@ -1269,8 +2836,12 @@ export function SkyIslandsCanvas({
   onSelectLevel
 }) {
   return (
-    <div className={`sky-canvas-shell adventure-canvas mode-${mode}`} data-voice-activity={voiceActivity}>
-      <BaseScene mode={mode}>
+    <div
+      className={`sky-canvas-shell adventure-canvas mode-${mode}`}
+      data-voice-activity={voiceActivity}
+      data-scene-type={mode === "level" ? activeLevel?.sceneType : "map"}
+    >
+      <BaseScene mode={mode} activeLevel={activeLevel}>
         {mode === "level" ? (
           <LevelScene
             level={activeLevel}

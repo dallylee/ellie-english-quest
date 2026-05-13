@@ -4,7 +4,7 @@ import { LoginScreen } from "./LoginScreen.jsx";
 import { SkyIslandsCanvas } from "./SkyIslandsCanvas.jsx";
 import { VoiceInterface } from "./VoiceInterface.jsx";
 import { orbMoods, sagaGames } from "./skyIslandsData.js";
-import { createVoiceGuide } from "./voiceGuide.js";
+import { createVoiceGuide, getVoiceCompatibilityNote, getVoiceGuideDiagnostics, primeVoice, QUIET_VOICE_MESSAGE } from "./voiceGuide.js";
 import { saveRemoteSaga } from "./firebaseClient.js";
 import { getRewardVisual } from "./assets/assetManifest.js";
 import { getLevelById, getNextLevel, getWorldById, isPlayableLevel, sagaWorlds } from "./sagaWorldData.js";
@@ -23,6 +23,22 @@ import {
 
 const SKY_WORLD_ID = "sky-islands";
 const CLOUD_HARBOR_ID = "cloud-harbor";
+
+function getRewardEventType(rewardName) {
+  if (rewardName === "Sunberry Basket") return "sunberry-basket";
+  if (rewardName === "Star Map Lens") return "star-map-lens";
+  if (rewardName === "Thunder Drum") return "thunder-drum";
+  if (rewardName === "Red Bus Ticket") return "red-bus-ticket";
+  return "compass";
+}
+
+function getFutureLevelMessage(level) {
+  if (level?.id === "rhythm-cloud-stage") return "This music island is waking up soon.";
+  if (level?.id === "london-wind-gate") return "This London gate is waking up soon.";
+  if (level?.id === "storm-crown-citadel") return "The storm citadel is waking up soon.";
+  if (level?.id === "school-star-observatory") return "This star island is waking up soon.";
+  return `${level?.title || "This island"} is waking up soon.`;
+}
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -53,10 +69,9 @@ function mergeRemoteSaga(localProgress, remoteSaga) {
 }
 
 function gameState(progress, game) {
-  const saga = normaliseSaga(progress.saga);
   if (game.id === SKY_WORLD_ID) return "playable";
-  if (game.id === "crystal-mystery") return saga.sagaUnlocks?.crystalMystery ? "playable" : "locked";
-  if (game.id === "time-portal-case") return saga.sagaUnlocks?.timePortalCase ? "playable" : "locked";
+  if (game.id === "crystal-mystery") return "locked";
+  if (game.id === "time-portal-case") return "locked";
   return game.initialState;
 }
 
@@ -120,6 +135,44 @@ function GameMenu({ view, open, onToggle, onClose, onReturnToMap, onRewards, onS
         </>
       ) : null}
     </div>
+  );
+}
+
+function VoiceDebugPanel({ activeTaskId, voiceActivity }) {
+  const enabled = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("debugVoice") === "1";
+  const [diagnostics, setDiagnostics] = useState(() => getVoiceGuideDiagnostics());
+
+  useEffect(() => {
+    if (!enabled) return undefined;
+    const update = () => setDiagnostics(getVoiceGuideDiagnostics());
+    update();
+    const timer = window.setInterval(update, 500);
+    return () => window.clearInterval(timer);
+  }, [enabled]);
+
+  if (!enabled) return null;
+
+  return (
+    <aside className="voice-debug-panel" aria-label="Voice diagnostics">
+      <strong>Voice debug</strong>
+      <span>task: {activeTaskId || diagnostics.currentTaskId || "none"}</span>
+      <span>activity: {voiceActivity}</span>
+      <span>speech synthesis: {diagnostics.speechSynthesisSupported ? "supported" : "unsupported"}</span>
+      <span>tts: {diagnostics.lastTtsProvider || "none"} / {diagnostics.lastTtsSpoken ? "played" : diagnostics.lastTtsError || "pending"}</span>
+      <span>browser tts fallback: {diagnostics.browserTtsFallbackUsed ? "used" : "not used"}</span>
+      <span>quiet fallback: {diagnostics.quietFallbackUsed ? "shown" : "no"}</span>
+      <span>last tts error: {diagnostics.lastTtsError || "none"}</span>
+      <span>speech recognition: {diagnostics.speechRecognitionSupported ? "supported" : "unsupported"}</span>
+      <span>lock: {diagnostics.activeListeningLock ? "active" : "idle"}</span>
+      <span>starts: {diagnostics.recognitionStartCount || 0}</span>
+      <span>stop: {diagnostics.lastRecognitionStopReason || "none"}</span>
+      <span>last stt error: {diagnostics.lastSttError || "none"}</span>
+      <span>permission: {diagnostics.permissionRequestAttempted ? "attempted" : "not yet"}</span>
+      <span>getUserMedia: {diagnostics.getUserMediaInvoked ? "yes" : "no"}</span>
+      <span>recognition: {diagnostics.speechRecognitionInvoked ? "yes" : "no"}</span>
+      <span>gemini: {diagnostics.geminiConnected ? "connected" : diagnostics.lastGeminiError || "not connected"}</span>
+      <span>audio: {diagnostics.audioContextUnlocked ? "unlocked" : "unknown"}</span>
+    </aside>
   );
 }
 
@@ -349,6 +402,7 @@ function SkyWorldView({
         </div>
       ) : null}
       {children}
+      <VoiceDebugPanel activeTaskId={activeTask?.id} voiceActivity={voiceActivity} />
     </main>
   );
 }
@@ -425,6 +479,7 @@ function SagaApp({ initialProgress, debugMode = false, onProgressChange, onExit,
   }
 
   function handleLocalOnly() {
+    primeVoice("local-only");
     const next = clone(progress);
     next.saga = normaliseSaga({
       ...next.saga,
@@ -440,6 +495,9 @@ function SagaApp({ initialProgress, debugMode = false, onProgressChange, onExit,
   function openWorld(worldId) {
     const world = getWorldById(worldId);
     if (gameState(progress, { id: worldId, initialState: "locked" }) !== "playable") return;
+    if (worldId !== SKY_WORLD_ID) {
+      return;
+    }
     setSelectedWorldId(worldId);
     setActiveLevelId(world.firstLevelId);
     setActiveTaskId(null);
@@ -457,6 +515,7 @@ function SagaApp({ initialProgress, debugMode = false, onProgressChange, onExit,
 
   async function startWorldIntro() {
     if (introBusy) return;
+    primeVoice("start-adventure");
     setIntroBusy(true);
     setLumaMood("happy");
     setVoiceActivity("orb-speaking");
@@ -468,7 +527,12 @@ function SagaApp({ initialProgress, debugMode = false, onProgressChange, onExit,
       mood: "happy",
       recentEvent: "world-map-intro"
     });
-    await mapVoiceGuide.playGuidePrompt(selectedWorld.introLine, { mood: "happy" });
+    const introVoice = await mapVoiceGuide.playGuidePrompt(selectedWorld.introLine, { mood: "happy" });
+    if (!introVoice.spoken) {
+      const compatibilityNote = getVoiceCompatibilityNote();
+      setCaption(compatibilityNote ? `${QUIET_VOICE_MESSAGE} ${compatibilityNote}` : QUIET_VOICE_MESSAGE);
+      await new Promise((resolve) => window.setTimeout(resolve, 850));
+    }
     setIntroStage("flying");
     await new Promise((resolve) => window.setTimeout(resolve, 950));
     const nextSaga = markWorldIntroSeen(progress.saga, selectedWorldId);
@@ -489,10 +553,11 @@ function SagaApp({ initialProgress, debugMode = false, onProgressChange, onExit,
     }
     if (!isPlayableLevel(level)) {
       setLumaMood("thinking");
-      setCaption(level.id === "school-star-observatory" ? "This star island is waking up soon." : `${level.title} is waking up soon.`);
+      setCaption(getFutureLevelMessage(level));
       return;
     }
     if (!canEnterLevel(saga, selectedWorldId, levelId)) return;
+    primeVoice("island-entry");
     setActiveLevelId(levelId);
     const firstTask = getActiveTask(saga, selectedWorldId, levelId);
     setActiveTaskId(firstTask?.id || null);
@@ -526,7 +591,7 @@ function SagaApp({ initialProgress, debugMode = false, onProgressChange, onExit,
       setRewardEvent({
         id: `${activeLevelId}-${Date.now()}`,
         label: result.rewardEarned,
-        type: result.rewardEarned === "Sunberry Basket" ? "sunberry-basket" : "compass"
+        type: getRewardEventType(result.rewardEarned)
       });
       setView("levelComplete");
     } else {
@@ -560,6 +625,9 @@ function SagaApp({ initialProgress, debugMode = false, onProgressChange, onExit,
     if (view !== "levelComplete") return undefined;
     const completedLevelId = activeLevelId;
     const nextLevel = getNextLevel(selectedWorldId, completedLevelId);
+    const completionPauseMs = ["school-star-observatory", "rhythm-cloud-stage", "london-wind-gate"].includes(completedLevelId)
+        ? 4300
+        : 2700;
     const timer = window.setTimeout(() => {
       if (!nextLevel) {
         setRewardEvent(null);
@@ -573,7 +641,7 @@ function SagaApp({ initialProgress, debugMode = false, onProgressChange, onExit,
       setActiveLevelId(nextLevel.id);
       setCaption(`The bridge to ${nextLevel.title} is waking.`);
       setRewardEvent(null);
-    }, 2700);
+    }, completionPauseMs);
     return () => window.clearTimeout(timer);
   }, [activeLevelId, selectedWorld.mapTitle, selectedWorldId, view]);
 
@@ -583,7 +651,7 @@ function SagaApp({ initialProgress, debugMode = false, onProgressChange, onExit,
     const timer = window.setTimeout(() => {
       setProgressionAnimation(null);
       setVoiceActivity("idle");
-      setCaption(isPlayableLevel(nextLevel) ? `${nextLevel.title} is ready.` : `${nextLevel.title} is waking up soon.`);
+      setCaption(isPlayableLevel(nextLevel) ? `${nextLevel.title} is ready.` : getFutureLevelMessage(nextLevel));
       setView("worldMap");
     }, 2600);
     return () => window.clearTimeout(timer);

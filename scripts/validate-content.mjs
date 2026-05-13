@@ -12,12 +12,78 @@ import {
   sagaGames,
   skyIslands
 } from "../src/v2/skyIslandsData.js";
-import { sagaWorlds, getLevelById } from "../src/v2/sagaWorldData.js";
+import { sagaWorlds, getLevelById, getWorldById } from "../src/v2/sagaWorldData.js";
 import { v2AssetManifest } from "../src/v2/assets/assetManifest.js";
 
 const errors = [];
 const ids = new Set();
 const rootDir = process.cwd();
+const sourceTextExtensions = new Set([".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs", ".html", ".css", ".json", ".md", ".svg"]);
+const envFileNames = new Set([".env", ".env.local", ".env.production", ".env.development"]);
+
+function collectTextFiles(directory) {
+  const fullDirectory = path.join(rootDir, directory);
+  if (!fs.existsSync(fullDirectory)) return [];
+
+  return fs.readdirSync(fullDirectory, { withFileTypes: true }).flatMap((entry) => {
+    const entryPath = path.join(fullDirectory, entry.name);
+    if (entry.isDirectory()) return collectTextFiles(path.relative(rootDir, entryPath));
+    if (!entry.isFile() || !sourceTextExtensions.has(path.extname(entry.name))) return [];
+    return [entryPath];
+  });
+}
+
+function collectSecretScanFiles(directory) {
+  const fullDirectory = path.join(rootDir, directory);
+  if (!fs.existsSync(fullDirectory)) return [];
+  return fs.readdirSync(fullDirectory, { withFileTypes: true }).flatMap((entry) => {
+    const entryPath = path.join(fullDirectory, entry.name);
+    if (entry.isDirectory()) return collectSecretScanFiles(path.relative(rootDir, entryPath));
+    if (!entry.isFile()) return [];
+    if (sourceTextExtensions.has(path.extname(entry.name)) || envFileNames.has(entry.name)) return [entryPath];
+    return [];
+  });
+}
+
+const criticalSecretChecks = [
+  { label: "Gemini Developer API key variable", regex: new RegExp(["GEMINI", "_API_KEY"].join(""), "i") },
+  { label: "Google Generative Language API marker", regex: new RegExp(["GENERATIVE", "_LANGUAGE"].join(""), "i") },
+  { label: "backend Google API key variable", regex: new RegExp(["GOOGLE", "_API_KEY"].join(""), "i") },
+  { label: "service account private key", regex: /-----BEGIN PRIVATE KEY-----|["']private_key["']\s*:/i },
+  { label: "service account email", regex: /["']client_email["']\s*:\s*["'][^"']+@[^"']+\.iam\.gserviceaccount\.com["']/i },
+  { label: "Firebase Admin SDK credential", regex: /firebase-admin|service_account/i },
+  { label: "Cloudflare secret variable", regex: new RegExp(["CLOUDFLARE", "(_API)?_(TOKEN|KEY|SECRET)"].join(""), "i") },
+  { label: "FCM server key", regex: /AAAA[A-Za-z0-9_-]{20,}:[A-Za-z0-9_-]{20,}/ },
+  { label: "OpenAI-style API key", regex: /sk-[A-Za-z0-9_-]{20,}/ }
+];
+
+const secretScanFiles = [
+  "index.html",
+  ...fs.readdirSync(rootDir, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && envFileNames.has(entry.name))
+    .map((entry) => path.join(rootDir, entry.name)),
+  ...collectSecretScanFiles("src"),
+  ...collectSecretScanFiles("scripts"),
+  ...collectSecretScanFiles("public"),
+  ...collectSecretScanFiles("reports"),
+  ...collectSecretScanFiles("dist")
+];
+
+for (const sourceFile of secretScanFiles) {
+  const sourcePath = path.isAbsolute(sourceFile) ? sourceFile : path.join(rootDir, sourceFile);
+  if (!fs.existsSync(sourcePath)) continue;
+  if (path.relative(rootDir, sourcePath) === path.join("scripts", "validate-content.mjs")) continue;
+  const sourceText = fs.readFileSync(sourcePath, "utf8");
+  for (const check of criticalSecretChecks) {
+    if (check.regex.test(sourceText)) {
+      errors.push(`Critical secret marker found in frontend/report/build file (${check.label}): ${path.relative(rootDir, sourcePath)}`);
+    }
+  }
+  const googleKeyMatches = sourceText.match(/AIza[0-9A-Za-z_-]{20,}/g) || [];
+  if (googleKeyMatches.length && !/firebase|firestore|authDomain|VITE_FIREBASE/i.test(sourceText)) {
+    errors.push(`Possible non-Firebase Google API key in frontend/report/build file: ${path.relative(rootDir, sourcePath)}`);
+  }
+}
 
 for (const level of levels) {
   if (!level.id) errors.push("Level missing id");
@@ -80,8 +146,12 @@ if (!progress.settings || typeof progress.settings.soundEnabled !== "boolean" ||
   errors.push("default progress missing sound settings");
 }
 
-if (progress.settings?.soundEnabled !== true || progress.settings?.voiceEnabled !== false) {
-  errors.push("default progress should start with sound on and voice off");
+if (progress.settings?.soundEnabled !== true || progress.settings?.voiceEnabled !== true) {
+  errors.push("default progress should start with sound on and Luma voice on");
+}
+
+if (progress.settings?.voicePreferenceSet !== false) {
+  errors.push("default progress should not mark voice preference as user-set");
 }
 
 if (!Array.isArray(progress.pendingRewardReveals)) {
@@ -165,6 +235,385 @@ if (!playableBreakfastBreeze || playableBreakfastBreeze.reward !== "Sunberry Bas
       }
     }
   }
+}
+
+const schoolStarObservatory = getLevelById("sky-islands", "school-star-observatory");
+const expectedSchoolStarTasks = [
+  {
+    title: "Open the Observatory Dome",
+    objectKey: "observatory-dome",
+    lumaLine: "The stars cannot come in. Say: Open the star roof, please.",
+    expectedAnswer: "Open the star roof, please.",
+    targetWords: ["open", "star", "roof", "please"],
+    gentleHint: "Ask the star roof to open."
+  },
+  {
+    title: "Wake the Blue Telescope",
+    objectKey: "blue-telescope",
+    lumaLine: "The telescope is looking the wrong way. Say: Telescope, find the English star.",
+    expectedAnswer: "Telescope, find the English star.",
+    targetWords: ["telescope", "English", "star"],
+    gentleHint: "Say English star."
+  },
+  {
+    title: "Set the Star Clock",
+    objectKey: "star-clock",
+    lumaLine: "The star clock is lost. Say: School starts at nine.",
+    expectedAnswer: "School starts at nine.",
+    targetWords: ["school", "starts", "nine"],
+    gentleHint: "Use school, starts and nine."
+  },
+  {
+    title: "Pack the Magic Bag",
+    objectKey: "magic-bag",
+    lumaLine: "The bag needs one book. Say: Put the book in my bag.",
+    expectedAnswer: "Put the book in my bag.",
+    targetWords: ["put", "book", "bag"],
+    gentleHint: "Say book in my bag."
+  },
+  {
+    title: "Find the Pencil Star",
+    objectKey: "pencil-star",
+    lumaLine: "Tell Luma where it is. Say: The pencil is behind the cloud.",
+    expectedAnswer: "The pencil is behind the cloud.",
+    targetWords: ["pencil", "behind", "cloud"],
+    gentleHint: "Use behind the cloud."
+  },
+  {
+    title: "Draw the Star Path",
+    objectKey: "star-path-board",
+    lumaLine: "Help me draw the path. Say: Draw a line to the star.",
+    expectedAnswer: "Draw a line to the star.",
+    targetWords: ["draw", "line", "star"],
+    gentleHint: "Say draw a line."
+  },
+  {
+    title: "Shine the Star Map Lens",
+    objectKey: "star-map-lens",
+    lumaLine: "Clean it with words. Say: The lens is shiny now.",
+    expectedAnswer: "The lens is shiny now.",
+    targetWords: ["lens", "shiny", "now"],
+    gentleHint: "Say shiny lens."
+  },
+  {
+    title: "Read the Star Clue",
+    objectKey: "star-clue",
+    lumaLine: "Read the clue with me. Say: The next island is singing.",
+    expectedAnswer: "The next island is singing.",
+    targetWords: ["next", "island", "singing"],
+    gentleHint: "Say next island singing."
+  }
+];
+
+if (!schoolStarObservatory || schoolStarObservatory.reward !== "Star Map Lens" || schoolStarObservatory.tasks?.length !== 8) {
+  errors.push("School Star Observatory must be the third complete 8-task playable level with Star Map Lens reward");
+} else if (schoolStarObservatory.implementationStatus !== "playable") {
+  errors.push("School Star Observatory must be marked playable");
+} else if (schoolStarObservatory.sceneType !== "star-observatory") {
+  errors.push("School Star Observatory must use the star-observatory scene type");
+} else {
+  for (const [taskIndex, expectedTask] of expectedSchoolStarTasks.entries()) {
+    const task = schoolStarObservatory.tasks[taskIndex];
+    for (const requiredField of ["screenObject", "lumaLine", "expectedAnswer", "targetWords", "successAnimation", "gentleHint"]) {
+      if (!task[requiredField] || (requiredField === "targetWords" && !Array.isArray(task.targetWords))) {
+        errors.push(`School Star Observatory task ${taskIndex + 1} missing playable field: ${requiredField}`);
+      }
+    }
+    for (const [field, expectedValue] of Object.entries(expectedTask)) {
+      const actualValue = task[field];
+      if (JSON.stringify(actualValue) !== JSON.stringify(expectedValue)) {
+        errors.push(`School Star Observatory task ${taskIndex + 1} ${field} must match the approved script`);
+      }
+    }
+  }
+}
+
+const rhythmCloudStage = getLevelById("sky-islands", "rhythm-cloud-stage");
+const expectedRhythmCloudStageTasks = [
+  {
+    title: "Turn On the Stage Lights",
+    objectKey: "stage-lights",
+    lumaLine: "The show needs light. Say: Lights on, please.",
+    expectedAnswer: "Lights on, please.",
+    targetWords: ["lights", "on", "please"],
+    gentleHint: "Say lights on, please."
+  },
+  {
+    title: "Wake the Microphone",
+    objectKey: "glowing-microphone",
+    lumaLine: "Tell the mic what you can do. Say: I can sing.",
+    expectedAnswer: "I can sing.",
+    targetWords: ["can", "sing"],
+    gentleHint: "Say I can sing."
+  },
+  {
+    title: "Clap the Cloud Beat",
+    objectKey: "rhythm-pads",
+    lumaLine: "Make a tiny beat. Say: I can clap the beat.",
+    expectedAnswer: "I can clap the beat.",
+    targetWords: ["can", "clap", "beat"],
+    gentleHint: "Use clap and beat."
+  },
+  {
+    title: "Find the Guitar Cloud",
+    objectKey: "guitar-cloud",
+    lumaLine: "Tell me the dance clue. Say: I like dancing.",
+    expectedAnswer: "I like dancing.",
+    targetWords: ["like", "dancing"],
+    gentleHint: "Say I like dancing."
+  },
+  {
+    title: "Help the Shy Thunder Puff",
+    objectKey: "thunder-puff",
+    lumaLine: "Make it feel safe. Say: You can join the show.",
+    expectedAnswer: "You can join the show.",
+    targetWords: ["join", "show"],
+    gentleHint: "Say join the show."
+  },
+  {
+    title: "Start the Tiny Show",
+    objectKey: "curtain-star",
+    lumaLine: "Start the show with kind words. Say: Welcome to my show.",
+    expectedAnswer: "Welcome to my show.",
+    targetWords: ["welcome", "show"],
+    gentleHint: "Say welcome to my show."
+  },
+  {
+    title: "Play the Thunder Drum",
+    objectKey: "thunder-drum",
+    lumaLine: "Play the magic drum. Say: Boom, boom, make a bridge.",
+    expectedAnswer: "Boom, boom, make a bridge.",
+    targetWords: ["boom", "make", "bridge"],
+    gentleHint: "Say make a bridge."
+  },
+  {
+    title: "Sing to the Wind Gate",
+    objectKey: "musical-wind-gate",
+    lumaLine: "One last line for the gate. Say: The song shows the way.",
+    expectedAnswer: "The song shows the way.",
+    targetWords: ["song", "shows", "way"],
+    gentleHint: "Say song shows the way."
+  }
+];
+
+if (!rhythmCloudStage || rhythmCloudStage.reward !== "Thunder Drum" || rhythmCloudStage.tasks?.length !== 8) {
+  errors.push("Rhythm Cloud Stage must be the fourth complete 8-task playable level with Thunder Drum reward");
+} else if (rhythmCloudStage.implementationStatus !== "playable") {
+  errors.push("Rhythm Cloud Stage must be marked playable");
+} else if (rhythmCloudStage.sceneType !== "cloud-stage") {
+  errors.push("Rhythm Cloud Stage must use the cloud-stage scene type");
+} else {
+  for (const [taskIndex, expectedTask] of expectedRhythmCloudStageTasks.entries()) {
+    const task = rhythmCloudStage.tasks[taskIndex];
+    for (const requiredField of ["screenObject", "lumaLine", "expectedAnswer", "targetWords", "successAnimation", "gentleHint"]) {
+      if (!task[requiredField] || (requiredField === "targetWords" && !Array.isArray(task.targetWords))) {
+        errors.push(`Rhythm Cloud Stage task ${taskIndex + 1} missing playable field: ${requiredField}`);
+      }
+    }
+    for (const [field, expectedValue] of Object.entries(expectedTask)) {
+      const actualValue = task[field];
+      if (JSON.stringify(actualValue) !== JSON.stringify(expectedValue)) {
+        errors.push(`Rhythm Cloud Stage task ${taskIndex + 1} ${field} must match the approved script`);
+      }
+    }
+  }
+}
+
+const londonWindGate = getLevelById("sky-islands", "london-wind-gate");
+const expectedLondonWindGateTasks = [
+  {
+    title: "Open the London Window",
+    objectKey: "london-window",
+    lumaLine: "The fog is hiding a place. Say: I can see London.",
+    expectedAnswer: "I can see London.",
+    targetWords: ["see", "London"],
+    gentleHint: "Say I can see London."
+  },
+  {
+    title: "Wake Big Ben",
+    objectKey: "big-ben-tower",
+    lumaLine: "Name the tower clue. Say: I can see Big Ben.",
+    expectedAnswer: "I can see Big Ben.",
+    targetWords: ["see", "Big", "Ben"],
+    gentleHint: "Say Big Ben."
+  },
+  {
+    title: "Fix the Red Bus Cloud",
+    objectKey: "red-bus-cloud",
+    lumaLine: "Tell the bus how we travel. Say: We can go by bus.",
+    expectedAnswer: "We can go by bus.",
+    targetWords: ["go", "bus"],
+    gentleHint: "Say go by bus."
+  },
+  {
+    title: "Find the Ticket Booth",
+    objectKey: "ticket-booth",
+    lumaLine: "Ask for a ticket kindly. Say: A ticket, please.",
+    expectedAnswer: "A ticket, please.",
+    targetWords: ["ticket", "please"],
+    gentleHint: "Say ticket, please."
+  },
+  {
+    title: "Turn Left at the Gate",
+    objectKey: "wind-arrows",
+    lumaLine: "Follow the arrow. Say: Turn left at the gate.",
+    expectedAnswer: "Turn left at the gate.",
+    targetWords: ["turn", "left", "gate"],
+    gentleHint: "Use turn left."
+  },
+  {
+    title: "Cross the River Ribbon",
+    objectKey: "river-ribbon",
+    lumaLine: "Tell Luma where to go. Say: Go over the river.",
+    expectedAnswer: "Go over the river.",
+    targetWords: ["go", "over", "river"],
+    gentleHint: "Say over the river."
+  },
+  {
+    title: "Stamp the Red Bus Ticket",
+    objectKey: "ticket-stamp",
+    lumaLine: "Make the ticket ready. Say: Stamp the ticket, please.",
+    expectedAnswer: "Stamp the ticket, please.",
+    targetWords: ["stamp", "ticket", "please"],
+    gentleHint: "Say stamp the ticket."
+  },
+  {
+    title: "Open the Wind Gate",
+    objectKey: "london-wind-gate",
+    lumaLine: "Use your travel spell. Say: London wind, open the way.",
+    expectedAnswer: "London wind, open the way.",
+    targetWords: ["London", "wind", "open", "way"],
+    gentleHint: "Say London wind, open the way."
+  }
+];
+
+if (!londonWindGate || londonWindGate.reward !== "Red Bus Ticket" || londonWindGate.tasks?.length !== 8) {
+  errors.push("London Wind Gate must be the fifth complete 8-task playable level with Red Bus Ticket reward");
+} else if (londonWindGate.implementationStatus !== "playable") {
+  errors.push("London Wind Gate must be marked playable");
+} else if (londonWindGate.sceneType !== "london-gate") {
+  errors.push("London Wind Gate must use the london-gate scene type");
+} else {
+  for (const [taskIndex, expectedTask] of expectedLondonWindGateTasks.entries()) {
+    const task = londonWindGate.tasks[taskIndex];
+    for (const requiredField of ["screenObject", "lumaLine", "expectedAnswer", "targetWords", "successAnimation", "gentleHint"]) {
+      if (!task[requiredField] || (requiredField === "targetWords" && !Array.isArray(task.targetWords))) {
+        errors.push(`London Wind Gate task ${taskIndex + 1} missing playable field: ${requiredField}`);
+      }
+    }
+    for (const [field, expectedValue] of Object.entries(expectedTask)) {
+      const actualValue = task[field];
+      if (JSON.stringify(actualValue) !== JSON.stringify(expectedValue)) {
+        errors.push(`London Wind Gate task ${taskIndex + 1} ${field} must match the approved script`);
+      }
+    }
+  }
+}
+
+const stormCrownCitadel = getLevelById("sky-islands", "storm-crown-citadel");
+const expectedStormCrownCitadelTasks = [
+  {
+    title: "Name the Storm Problem",
+    objectKey: "storm-crystal",
+    lumaLine: "Tell me the problem. Say: The storm is hiding the crown.",
+    expectedAnswer: "The storm is hiding the crown.",
+    targetWords: ["storm", "hiding", "crown"],
+    gentleHint: "Use storm, hiding and crown."
+  },
+  {
+    title: "Use the Cloud Compass",
+    objectKey: "cloud-compass-pedestal",
+    lumaLine: "The compass is confused. Say: Compass, show the way.",
+    expectedAnswer: "Compass, show the way.",
+    targetWords: ["compass", "show", "way"],
+    gentleHint: "Say compass, show the way."
+  },
+  {
+    title: "Share the Sunberry Basket",
+    objectKey: "sunberry-basket-pedestal",
+    lumaLine: "The puff needs kindness. Say: Here is a sunberry.",
+    expectedAnswer: "Here is a sunberry.",
+    targetWords: ["sunberry"],
+    gentleHint: "Say sunberry."
+  },
+  {
+    title: "Shine the Star Map Lens",
+    objectKey: "star-lens-pedestal",
+    lumaLine: "Aim the lens. Say: Shine on the door.",
+    expectedAnswer: "Shine on the door.",
+    targetWords: ["shine", "door"],
+    gentleHint: "Say shine on the door."
+  },
+  {
+    title: "Beat the Thunder Drum",
+    objectKey: "thunder-drum-pedestal",
+    lumaLine: "Make a brave beat. Say: The drum is strong.",
+    expectedAnswer: "The drum is strong.",
+    targetWords: ["drum", "strong"],
+    gentleHint: "Say drum is strong."
+  },
+  {
+    title: "Use the Red Bus Ticket",
+    objectKey: "red-bus-route",
+    lumaLine: "Tell the route what we will do. Say: We will go to the crown.",
+    expectedAnswer: "We will go to the crown.",
+    targetWords: ["will", "go", "crown"],
+    gentleHint: "Use will, go and crown."
+  },
+  {
+    title: "Pull the Golden Lever",
+    objectKey: "golden-lever",
+    lumaLine: "Tell me your plan. Say: I will find the last clue.",
+    expectedAnswer: "I will find the last clue.",
+    targetWords: ["will", "find", "clue"],
+    gentleHint: "Say I will find the clue."
+  },
+  {
+    title: "Open the Crown Door",
+    objectKey: "crown-door",
+    lumaLine: "Use your brave sentence. Say: I am brave and I can solve the mystery.",
+    expectedAnswer: "I am brave and I can solve the mystery.",
+    targetWords: ["brave", "can", "solve", "mystery"],
+    gentleHint: "Say brave, solve mystery."
+  }
+];
+
+if (!stormCrownCitadel || stormCrownCitadel.reward !== "Storm Crown Key" || stormCrownCitadel.tasks?.length !== 8) {
+  errors.push("Storm Crown Citadel must remain present as the sixth 8-task future level with Storm Crown Key reward");
+} else if (stormCrownCitadel.implementationStatus === "playable") {
+  errors.push("Storm Crown Citadel must not be marked playable in this hotfix");
+} else if (stormCrownCitadel.sceneType !== "storm-citadel") {
+  errors.push("Storm Crown Citadel future data must keep the storm-citadel scene type");
+} else {
+  for (const [taskIndex, expectedTask] of expectedStormCrownCitadelTasks.entries()) {
+    const task = stormCrownCitadel.tasks[taskIndex];
+    for (const requiredField of ["screenObject", "lumaLine", "expectedAnswer", "targetWords", "successAnimation", "gentleHint"]) {
+      if (!task[requiredField] || (requiredField === "targetWords" && !Array.isArray(task.targetWords))) {
+        errors.push(`Storm Crown Citadel task ${taskIndex + 1} missing playable field: ${requiredField}`);
+      }
+    }
+    for (const [field, expectedValue] of Object.entries(expectedTask)) {
+      const actualValue = task[field];
+      if (JSON.stringify(actualValue) !== JSON.stringify(expectedValue)) {
+        errors.push(`Storm Crown Citadel task ${taskIndex + 1} ${field} must match the approved script`);
+      }
+    }
+  }
+}
+
+const skyIslandRewards = getWorldById("sky-islands").levels.map((level) => level.reward);
+const expectedSkyIslandRewards = ["Cloud Compass", "Sunberry Basket", "Star Map Lens", "Thunder Drum", "Red Bus Ticket", "Storm Crown Key"];
+if (JSON.stringify(skyIslandRewards) !== JSON.stringify(expectedSkyIslandRewards)) {
+  errors.push("Sky Islands must expose all six rewards in order, ending with Storm Crown Key");
+}
+
+const crystalMysteryWorld = getWorldById("crystal-mystery");
+if (crystalMysteryWorld.levels.some((level) => level.implementationStatus === "playable")) {
+  errors.push("Crystal Mystery must not mark any gameplay levels playable yet");
+}
+
+if (progress.saga.sagaUnlocks?.crystalMystery !== false || progress.saga.sagaUnlocks?.timePortalCase !== false) {
+  errors.push("Default saga progress must keep Crystal Mystery and Time Portal Case locked");
 }
 
 if (!Array.isArray(skyIslands) || skyIslands.length !== 6) {
@@ -267,6 +716,12 @@ if (!mainSource.includes(END_GAME_VIDEO_SRC)) {
   errors.push("Home flow must reference the v2 end-game animation video");
 }
 
+for (const requiredVideoSnippet of ["muted playsinline preload=\"auto\"", "endVideoPlay", "Tap to play magic movie", "video.play()"]) {
+  if (!mainSource.includes(requiredVideoSnippet)) {
+    errors.push(`End-game video fallback missing required piece: ${requiredVideoSnippet}`);
+  }
+}
+
 if (!mainSource.includes("window.debugUnlockV2") || !mainSource.includes("import.meta.env.DEV")) {
   errors.push("V2 debug unlock hook must exist only behind the dev environment guard");
 }
@@ -280,6 +735,7 @@ if (VOICE_PROXY_URL !== "wss://lucky-dawn-d422.dallyzg.workers.dev") {
 }
 
 const voiceGuideSource = fs.readFileSync(path.join(rootDir, "src", "v2", "voiceGuide.js"), "utf8");
+const sagaAppSource = fs.readFileSync(path.join(rootDir, "src", "v2", "SagaApp.jsx"), "utf8");
 for (const mood of ["happy", "thinking", "listening"]) {
   if (!voiceGuideSource.includes(`${mood}:`)) {
     errors.push(`Voice guide must include Gemini mood instruction for ${mood}`);
@@ -302,6 +758,28 @@ for (const requiredSnippet of ["extractAudioChunksFromValue", "inlineData", "aud
   if (!voiceGuideSource.includes(requiredSnippet)) {
     errors.push(`Voice guide missing WebSocket audio playback piece: ${requiredSnippet}`);
   }
+}
+
+for (const requiredSnippet of ["QUIET_VOICE_MESSAGE", "activeListeningLock", "recognitionStartCount", "lastRecognitionStopReason", "permissionRequestAttempted", "speechRecognitionInvoked", "quietFallbackUsed"]) {
+  if (!voiceGuideSource.includes(requiredSnippet)) {
+    errors.push(`Voice guide missing hotfix diagnostic/quiet-mode piece: ${requiredSnippet}`);
+  }
+}
+
+for (const debugLabel of ["speech synthesis:", "browser tts fallback:", "quiet fallback:", "last tts error:", "last stt error:"]) {
+  if (!sagaAppSource.includes(debugLabel)) {
+    errors.push(`debugVoice panel missing ${debugLabel}`);
+  }
+}
+
+const loginScreenSource = fs.readFileSync(path.join(rootDir, "src", "v2", "LoginScreen.jsx"), "utf8");
+for (const requiredSnippet of ["Create Eli PIN", "Enter Eli's PIN", "Reset Eli PIN", "Parent password reset email sent"]) {
+  if (!loginScreenSource.includes(requiredSnippet)) {
+    errors.push(`PIN flow missing required copy/state: ${requiredSnippet}`);
+  }
+}
+if (/PIN (sent|emailed)|check your email for Eli PIN/i.test(loginScreenSource)) {
+  errors.push("PIN flow must not imply Eli PIN is sent by email");
 }
 
 const skyCanvasSource = fs.readFileSync(path.join(rootDir, "src", "v2", "SkyIslandsCanvas.jsx"), "utf8");
@@ -363,8 +841,8 @@ const v2Stats = sagaWorlds.reduce(
   { levels: 0, playableLevels: 0, tasks: 0 },
 );
 
-if (v2Stats.playableLevels !== 2) {
-  errors.push(`V2 should currently expose exactly 2 playable levels, found ${v2Stats.playableLevels}`);
+if (v2Stats.playableLevels !== 5) {
+  errors.push(`V2 should expose exactly 5 playable levels during the hotfix, found ${v2Stats.playableLevels}`);
 }
 
 if (errors.length) {
@@ -382,5 +860,9 @@ console.log(
     `${v2Stats.playableLevels} playable V2 levels`,
     `Cloud Harbor playable: ${playableCloudHarbor.implementationStatus === "playable" ? "yes" : "no"}`,
     `Breakfast Breeze playable: ${playableBreakfastBreeze.implementationStatus === "playable" ? "yes" : "no"}`,
+    `School Star Observatory playable: ${schoolStarObservatory.implementationStatus === "playable" ? "yes" : "no"}`,
+    `Rhythm Cloud Stage playable: ${rhythmCloudStage.implementationStatus === "playable" ? "yes" : "no"}`,
+    `London Wind Gate playable: ${londonWindGate.implementationStatus === "playable" ? "yes" : "no"}`,
+    `Storm Crown Citadel playable: ${stormCrownCitadel.implementationStatus === "playable" ? "yes" : "no"}`,
   ].join("; ") + ".",
 );

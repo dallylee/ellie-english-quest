@@ -4,4 +4,6 @@ dist/
 reports/
 .DS_Store
 .env
+.env.*
+!.env.example
 *.log

@@ -1,9 +1,78 @@
-import { getSpeechRecognition, normaliseSpeech, speakAsync, stopSpeaking } from "../lib/speech.js";
+import {
+  getSpeechDiagnostics,
+  getSpeechRecognition,
+  normaliseSpeech,
+  primeSpeech,
+  speakAsync,
+  stopSpeaking
+} from "../lib/speech.js";
 import { VOICE_PROXY_URL } from "./skyIslandsData.js";
 
 const LIVE_MODEL = "models/gemini-2.0-flash-exp";
 const AUDIO_RESPONSE_MODALITIES = ["AUDIO"];
 const OUTPUT_SAMPLE_RATE = 24000;
+export const QUIET_VOICE_MESSAGE = "Luma voice is quiet on this device. Read with me.";
+
+const voiceDebugState = {
+  currentTaskId: null,
+  activeListeningLock: false,
+  recognitionStartCount: 0,
+  lastRecognitionStopReason: null,
+  permissionRequestAttempted: false,
+  getUserMediaInvoked: false,
+  speechRecognitionInvoked: false,
+  lastTtsProvider: null,
+  lastTtsSpoken: false,
+  lastTtsError: null,
+  lastSttError: null,
+  geminiConnected: false,
+  lastGeminiError: null,
+  browserTtsFallbackUsed: false,
+  quietFallbackUsed: false,
+  lastPrimeReason: null
+};
+
+let activeListen = null;
+
+function updateVoiceDebug(patch) {
+  Object.assign(voiceDebugState, patch);
+}
+
+function resetVoiceDebugForTask(taskId) {
+  if (!taskId || voiceDebugState.currentTaskId === taskId) return;
+  updateVoiceDebug({
+    currentTaskId: taskId,
+    activeListeningLock: false,
+    recognitionStartCount: 0,
+    lastRecognitionStopReason: null,
+    permissionRequestAttempted: false,
+    getUserMediaInvoked: false,
+    speechRecognitionInvoked: false,
+    lastSttError: null
+  });
+}
+
+export function primeVoice(reason = "gesture") {
+  const primed = primeSpeech(reason);
+  updateVoiceDebug({ lastPrimeReason: reason });
+  return primed;
+}
+
+export function getVoiceGuideDiagnostics() {
+  return {
+    ...voiceDebugState,
+    ...getSpeechDiagnostics()
+  };
+}
+
+export function getVoiceCompatibilityNote() {
+  if (typeof navigator === "undefined") return "";
+  const ua = navigator.userAgent || "";
+  const isiOS = /iPad|iPhone|iPod/.test(ua);
+  const safari = /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS/.test(ua);
+  const inApp = /FBAN|FBAV|Instagram|Line|MicroMessenger|WhatsApp/i.test(ua);
+  return isiOS && (!safari || inApp) ? "For Luma's voice, open in Safari." : "";
+}
 
 const TEACHER_PROMPT = [
   "You are the patient English teacher and glowing orb guide for Eli.",
@@ -96,46 +165,114 @@ function buildClientContent({ prompt, mood, world, level, task, recentEvent }) {
   };
 }
 
-function listenWithBrowserSpeech({ timeoutMs = 9000 } = {}) {
+function finishActiveListen(reason, result = {}) {
+  if (!activeListen || activeListen.settled) return;
+  const current = activeListen;
+  current.settled = true;
+  window.clearTimeout(current.timer);
+  updateVoiceDebug({
+    activeListeningLock: false,
+    lastRecognitionStopReason: reason,
+    lastSttError: result.error ? result.error : null
+  });
+  activeListen = null;
+  if (reason === "result" || reason.startsWith("error")) {
+    try {
+      current.recognition.stop();
+    } catch {
+      // Recognition may already be closed.
+    }
+  }
+  current.resolve({
+    provider: "browser-stt",
+    transcript: "",
+    ...result,
+    stopReason: reason
+  });
+}
+
+function stopActiveRecognition(reason = "stopped") {
+  if (!activeListen) return;
+  try {
+    activeListen.recognition.abort();
+  } catch {
+    try {
+      activeListen.recognition.stop();
+    } catch {
+      // Speech recognition is optional.
+    }
+  }
+  finishActiveListen(reason, { transcript: "", stopped: true });
+}
+
+function listenWithBrowserSpeech({ timeoutMs = 9000, taskId = null } = {}) {
   return new Promise((resolve) => {
+    resetVoiceDebugForTask(taskId);
+    if (activeListen && !activeListen.settled) {
+      updateVoiceDebug({ lastSttError: "duplicate-listening-blocked" });
+      resolve({ provider: "browser-stt", transcript: "", error: true, duplicate: true });
+      return;
+    }
+
+    updateVoiceDebug({ speechRecognitionInvoked: true });
     const recognition = getSpeechRecognition();
     if (!recognition) {
+      updateVoiceDebug({
+        activeListeningLock: false,
+        lastRecognitionStopReason: "unsupported",
+        lastSttError: "speech-recognition-unavailable"
+      });
       resolve({ provider: "tap", transcript: "", available: false });
       return;
     }
 
-    let settled = false;
+    updateVoiceDebug({
+      activeListeningLock: true,
+      recognitionStartCount: voiceDebugState.recognitionStartCount + 1,
+      permissionRequestAttempted: true,
+      lastRecognitionStopReason: null,
+      lastSttError: null
+    });
+
     const timer = window.setTimeout(() => {
-      if (settled) return;
-      settled = true;
       try {
-        recognition.stop();
+        recognition.abort();
       } catch {
         // Speech recognition is optional.
       }
-      resolve({ provider: "browser-stt", transcript: "", timedOut: true });
+      finishActiveListen("timeout", { transcript: "", timedOut: true });
     }, timeoutMs);
 
-    recognition.onresult = (event) => {
-      if (settled) return;
-      settled = true;
-      window.clearTimeout(timer);
-      const transcript = event.results?.[0]?.[0]?.transcript || "";
-      resolve({ provider: "browser-stt", transcript });
+    activeListen = {
+      recognition,
+      resolve,
+      timer,
+      settled: false
     };
 
-    recognition.onerror = () => {
-      if (settled) return;
-      settled = true;
-      window.clearTimeout(timer);
-      resolve({ provider: "browser-stt", transcript: "", error: true });
+    recognition.onresult = (event) => {
+      const transcript = event.results?.[0]?.[0]?.transcript || "";
+      finishActiveListen("result", { transcript });
+    };
+
+    recognition.onerror = (event) => {
+      finishActiveListen(`error:${event?.error || "unknown"}`, {
+        transcript: "",
+        error: event?.error || true
+      });
+    };
+
+    recognition.onend = () => {
+      finishActiveListen("ended", { transcript: "" });
     };
 
     try {
       recognition.start();
-    } catch {
-      window.clearTimeout(timer);
-      resolve({ provider: "browser-stt", transcript: "", error: true });
+    } catch (error) {
+      finishActiveListen("start-error", {
+        transcript: "",
+        error: error?.message || true
+      });
     }
   });
 }
@@ -421,6 +558,7 @@ export function createVoiceGuide({ voiceEnabled = true } = {}) {
       activeTask = task || clue || null;
       activeRecentEvent = recentEvent;
       activeMood = mood;
+      resetVoiceDebugForTask(activeTask?.id || null);
 
       if (!voiceEnabled) {
         session = {
@@ -430,21 +568,35 @@ export function createVoiceGuide({ voiceEnabled = true } = {}) {
         return session;
       }
 
-      try {
-        await connectLiveSocket();
-        return { provider: "gemini-live", session };
-      } catch (error) {
-        cleanupSocket();
-        session = {
-          provider: "browser-fallback",
-          reason: error.message,
-          uid: uid || null
-        };
-        return session;
-      }
+      primeVoice("voice-session");
+      session = {
+        provider: "browser-fallback",
+        reason: "Browser voice is ready while Gemini warms up.",
+        uid: uid || null
+      };
+
+      connectLiveSocket()
+        .then(() => {
+          updateVoiceDebug({ geminiConnected: true, lastGeminiError: null });
+        })
+        .catch((error) => {
+          cleanupSocket();
+          updateVoiceDebug({
+            geminiConnected: false,
+            lastGeminiError: error?.message || "Gemini Live unavailable"
+          });
+          session = {
+            provider: "browser-fallback",
+            reason: error?.message || "Gemini Live unavailable",
+            uid: uid || null
+          };
+        });
+
+      return session;
     },
 
-    stopSession() {
+    stopSession(reason = "session-stop") {
+      stopActiveRecognition(reason);
       cleanupSocket();
       liveAudio.stop();
       session = null;
@@ -466,16 +618,41 @@ export function createVoiceGuide({ voiceEnabled = true } = {}) {
             task: activeTask,
             recentEvent: activeRecentEvent
           })));
-          return await turnPromise;
-        } catch {
+          const liveResult = await turnPromise;
+          if (liveResult.spoken) {
+            updateVoiceDebug({
+              lastTtsProvider: "gemini-live",
+              lastTtsSpoken: true,
+              lastTtsError: null,
+              lastGeminiError: null,
+              browserTtsFallbackUsed: false,
+              quietFallbackUsed: false
+            });
+            return liveResult;
+          }
+          throw new Error("Gemini Live returned no audio");
+        } catch (error) {
           cleanupSocket();
           liveAudio.stop();
-          session = { provider: "browser-fallback", reason: "Gemini Live playback failed" };
+          session = { provider: "browser-fallback", reason: error?.message || "Gemini Live playback failed" };
+          updateVoiceDebug({
+            lastTtsProvider: "gemini-live",
+            lastTtsSpoken: false,
+            lastTtsError: session.reason,
+            lastGeminiError: session.reason
+          });
         }
       }
 
       const result = await speakAsync(prompt, voiceOptionsForMood(mood));
-      return { provider: "browser-tts", spoken: result.spoken };
+      updateVoiceDebug({
+        lastTtsProvider: "browser-tts",
+        lastTtsSpoken: Boolean(result.spoken),
+        lastTtsError: result.error || null,
+        browserTtsFallbackUsed: true,
+        quietFallbackUsed: !result.spoken
+      });
+      return { provider: "browser-tts", spoken: result.spoken, error: result.error || null };
     },
 
     async listenForAnswer(options) {

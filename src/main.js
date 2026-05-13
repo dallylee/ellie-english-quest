@@ -1,6 +1,6 @@
 import "./styles.css";
 import { learnerProfile, gameConfig, levels, rewardMilestones } from "./data/curriculum.js";
-import { speak, getSpeechRecognition, normaliseSpeech, stopSpeaking } from "./lib/speech.js";
+import { primeSpeech, speak, getSpeechRecognition, normaliseSpeech, stopSpeaking } from "./lib/speech.js";
 import { playSound } from "./lib/sound.js";
 import { loadProgress, saveProgress, resetProgress, recalcAndUnlock, starsFromScore } from "./lib/storage.js";
 
@@ -221,6 +221,7 @@ function bindGlobalActions() {
         ui.voiceNotice = "Voice stays on for this game.";
       } else {
         progress.settings[setting] = nextValue;
+        if (setting === "voiceEnabled") progress.settings.voicePreferenceSet = true;
         if (setting === "voiceEnabled" && !nextValue) stopSpeaking();
         if (setting === "voiceEnabled") ui.voiceNotice = null;
       }
@@ -249,24 +250,71 @@ function renderEndGameVideo() {
     <div class="end-video-screen">
       ${magicDecor()}
       <main class="end-video-card">
-        <video class="end-game-video" src="${END_GAME_VIDEO}" autoplay playsinline controls></video>
+        <div class="end-video-frame" data-video-state="loading">
+          <video class="end-game-video" src="${END_GAME_VIDEO}" autoplay muted playsinline preload="auto" controls poster="${ELI_IMAGE}"></video>
+          <div class="end-video-placeholder" aria-live="polite">
+            <div class="end-video-sigil" aria-hidden="true">✦</div>
+            <p>The magic movie is ready.</p>
+            <button class="secondary" id="endVideoPlay" type="button">Tap to play magic movie</button>
+          </div>
+        </div>
         <div class="end-video-actions">
           <p class="eyebrow">Magic complete</p>
           <h1>A new adventure is opening.</h1>
+          <p class="end-video-status" id="endVideoStatus">The movie can play muted on this screen. Continue is always ready.</p>
           <button class="primary" id="endVideoContinue">Continue</button>
         </div>
       </main>
     </div>
   `;
   const video = document.querySelector(".end-game-video");
+  const videoFrame = document.querySelector(".end-video-frame");
+  const playButton = document.getElementById("endVideoPlay");
+  const status = document.getElementById("endVideoStatus");
   const continueButton = document.getElementById("endVideoContinue");
   const continueToHome = () => {
+    primeSpeech("end-video-continue");
     markNewAdventureReady({ persist: !hasDebugV2Unlock() });
     playEffect("announcement");
     renderHome();
   };
+  const showVideoFallback = (message = "Tap to play magic movie, or continue to the adventure.") => {
+    if (videoFrame) videoFrame.dataset.videoState = "fallback";
+    if (status) status.textContent = message;
+  };
+  const hideVideoFallback = () => {
+    if (videoFrame) videoFrame.dataset.videoState = "playing";
+    if (status) status.textContent = "The magic movie is playing muted. Continue is always ready.";
+  };
+  const tryPlayVideo = ({ manual = false } = {}) => {
+    if (!video) return;
+    video.muted = true;
+    video.playsInline = true;
+    const playPromise = video.play();
+    if (playPromise && typeof playPromise.then === "function") {
+      playPromise
+        .then(hideVideoFallback)
+        .catch(() => {
+          showVideoFallback(manual
+            ? "This browser blocked the movie, but the next adventure is ready."
+            : "Tap to play magic movie, or continue to the adventure.");
+        });
+    } else {
+      hideVideoFallback();
+    }
+  };
   video?.addEventListener("ended", continueToHome, { once: true });
+  video?.addEventListener("playing", hideVideoFallback);
+  video?.addEventListener("error", () => showVideoFallback("The movie could not load here, but the next adventure is ready."));
+  playButton?.addEventListener("click", () => {
+    primeSpeech("end-video-manual-play");
+    tryPlayVideo({ manual: true });
+  });
   continueButton.addEventListener("click", continueToHome);
+  tryPlayVideo();
+  window.setTimeout(() => {
+    if (!video || video.paused) showVideoFallback();
+  }, 900);
 }
 
 function renderHome() {
@@ -312,6 +360,7 @@ function renderHome() {
     render();
   });
   document.getElementById("newAdventureBtn")?.addEventListener("click", () => {
+    primeSpeech("new-adventure");
     playEffect("announcement");
     ui.screen = "saga";
     render();

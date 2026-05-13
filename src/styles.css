@@ -1351,6 +1351,12 @@ button:disabled {
   overflow-wrap: anywhere;
 }
 
+.pin-mode-title {
+  margin: 0;
+  color: #173047;
+  font-size: clamp(1.15rem, 2vw, 1.45rem);
+}
+
 .text-button {
   border: 0;
   background: transparent;
@@ -1358,6 +1364,29 @@ button:disabled {
   font: inherit;
   font-weight: 900;
   cursor: pointer;
+}
+
+.voice-debug-panel {
+  position: fixed;
+  right: max(0.75rem, env(safe-area-inset-right));
+  bottom: max(0.75rem, env(safe-area-inset-bottom));
+  z-index: 30;
+  width: min(18rem, calc(100vw - 1.5rem));
+  display: grid;
+  gap: 0.18rem;
+  padding: 0.7rem;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 8px;
+  color: #f8fdff;
+  background: rgba(23, 48, 71, 0.82);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.22);
+  font-size: 0.72rem;
+  line-height: 1.25;
+  pointer-events: none;
+}
+
+.voice-debug-panel strong {
+  font-size: 0.78rem;
 }
 
 .saga-header {
@@ -1852,17 +1881,66 @@ button:disabled {
   box-shadow: 0 24px 70px rgba(43, 97, 137, 0.18);
 }
 
+.end-video-frame {
+  position: relative;
+  overflow: hidden;
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 50% 38%, rgba(255, 240, 168, 0.45), transparent 12rem),
+    linear-gradient(135deg, #173047, #514dd6 52%, #ffcf6d);
+  aspect-ratio: 16 / 9;
+}
+
 .end-game-video {
   width: 100%;
-  aspect-ratio: 16 / 9;
+  height: 100%;
   border-radius: 8px;
-  background: #173047;
+  background: transparent;
   object-fit: contain;
+  display: block;
+}
+
+.end-video-placeholder {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  color: #ffffff;
+  text-align: center;
+  background:
+    radial-gradient(circle at 52% 42%, rgba(255, 240, 168, 0.38), transparent 7rem),
+    linear-gradient(135deg, rgba(23, 48, 71, 0.88), rgba(81, 77, 214, 0.82));
+  transition: opacity 0.2s ease;
+}
+
+.end-video-frame[data-video-state="playing"] .end-video-placeholder {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.end-video-sigil {
+  width: 4rem;
+  height: 4rem;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #173047;
+  background: #fff0a8;
+  box-shadow: 0 0 36px rgba(255, 240, 168, 0.7);
+  font-size: 2rem;
 }
 
 .end-video-actions {
   display: grid;
   gap: 0.5rem;
+}
+
+.end-video-status {
+  margin: 0;
+  color: #476275;
 }
 
 .end-video-actions h1,
@@ -2502,6 +2580,44 @@ button:disabled {
     linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 34%, rgba(25, 85, 141, 0.1));
 }
 
+.sky-canvas-shell[data-scene-type="star-observatory"]::before {
+  opacity: 0.24;
+  filter: hue-rotate(54deg) saturate(0.82) brightness(0.72);
+}
+
+.sky-canvas-shell[data-scene-type="star-observatory"]::after {
+  background:
+    radial-gradient(circle at 54% 18%, rgba(255, 240, 168, 0.2), transparent 13rem),
+    radial-gradient(circle at 22% 80%, rgba(138, 141, 255, 0.28), transparent 15rem),
+    linear-gradient(180deg, rgba(8, 12, 48, 0.12), transparent 32%, rgba(5, 10, 34, 0.22));
+}
+
+.sky-canvas-shell[data-scene-type="cloud-stage"]::before {
+  opacity: 0.34;
+  filter: hue-rotate(-28deg) saturate(1.24) brightness(1.04);
+}
+
+.sky-canvas-shell[data-scene-type="cloud-stage"]::after {
+  background:
+    radial-gradient(circle at 48% 16%, rgba(255, 240, 168, 0.24), transparent 12rem),
+    radial-gradient(circle at 22% 76%, rgba(116, 255, 246, 0.18), transparent 14rem),
+    radial-gradient(circle at 78% 74%, rgba(255, 131, 198, 0.24), transparent 13rem),
+    linear-gradient(180deg, rgba(70, 42, 152, 0.08), transparent 34%, rgba(37, 20, 83, 0.18));
+}
+
+.sky-canvas-shell[data-scene-type="london-gate"]::before {
+  opacity: 0.38;
+  filter: hue-rotate(8deg) saturate(0.9) brightness(1.08);
+}
+
+.sky-canvas-shell[data-scene-type="london-gate"]::after {
+  background:
+    radial-gradient(circle at 50% 16%, rgba(255, 246, 196, 0.3), transparent 13rem),
+    radial-gradient(circle at 20% 78%, rgba(255, 107, 107, 0.16), transparent 14rem),
+    radial-gradient(circle at 82% 74%, rgba(186, 246, 255, 0.2), transparent 15rem),
+    linear-gradient(180deg, rgba(98, 121, 140, 0.08), transparent 34%, rgba(94, 117, 129, 0.16));
+}
+
 .map-hud {
   position: absolute;
   z-index: 11;
@@ -2701,6 +2817,14 @@ button:disabled {
   z-index: 20;
   background: linear-gradient(180deg, rgba(255, 246, 196, 0.96), rgba(255, 224, 137, 0.92));
   box-shadow: 0 12px 28px rgba(9, 40, 80, 0.2), 0 0 0 3px rgba(255, 255, 255, 0.22);
+}
+
+.voice-fallback-chip:hover {
+  transform: translateX(-50%) translateY(-1px);
+}
+
+.voice-fallback-chip:active {
+  transform: translateX(-50%) translateY(1px) scale(0.99);
 }
 
 .reward-room-v2 {
@@ -2977,4 +3101,10 @@ button:disabled {
     min-height: clamp(4.7rem, 12.2svh, 6rem);
     padding: 0.32rem 0.22rem;
   }
+
+  .v2-trophy strong {
+    font-size: clamp(0.52rem, 2.55vw, 0.68rem);
+    line-height: 1.02;
+  }
+
 }

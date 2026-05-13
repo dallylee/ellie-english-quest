@@ -14,4 +14,4 @@
 
 No third-party public assets were added in this pass.
 
-The V2 presentation also uses procedural React Three Fiber / Three.js geometry for the Sky Islands map, Cloud Harbor, Breakfast Breeze, reward objects, CSS effects, and existing local sound assets already present in the project.
+The V2 presentation also uses procedural React Three Fiber / Three.js geometry for the Sky Islands map, Cloud Harbor, Breakfast Breeze, School Star Observatory, Rhythm Cloud Stage, London Wind Gate, locked Storm Crown Citadel map marker, reward objects, CSS effects, and existing local sound assets already present in the project.

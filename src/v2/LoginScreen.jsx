@@ -1,18 +1,31 @@
 import { useEffect, useState } from "react";
 import {
+  createEliPin,
   createParentAccount,
+  getEliPinStatus,
   listenForParentAuth,
   loadRemoteSaga,
-  setOrVerifyEliPin,
+  resetEliPin,
+  sendParentPasswordReset,
   signInParent,
-  signOutParent
+  signOutParent,
+  verifyEliPin
 } from "./firebaseClient.js";
+
+function pinModeTitle(mode) {
+  if (mode === "create") return "Create Eli PIN";
+  if (mode === "reset") return "Reset Eli PIN";
+  return "Enter Eli's PIN";
+}
 
 export function LoginScreen({ onReady, onLocalOnly }) {
   const [authUser, setAuthUser] = useState(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [pin, setPin] = useState("");
+  const [confirmPin, setConfirmPin] = useState("");
+  const [pinMode, setPinMode] = useState("enter");
+  const [profileLoading, setProfileLoading] = useState(false);
   const [message, setMessage] = useState("Sign in with the parent account, then unlock Eli's profile.");
   const [busy, setBusy] = useState(false);
 
@@ -20,6 +33,31 @@ export function LoginScreen({ onReady, onLocalOnly }) {
     setAuthUser(user);
     if (user) setEmail(user.email || "");
   }), []);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadPinState() {
+      if (!authUser) return;
+      setProfileLoading(true);
+      setMessage("Checking Eli PIN setup...");
+      try {
+        const status = await getEliPinStatus(authUser.uid);
+        if (cancelled) return;
+        setPinMode(status.pinSet ? "enter" : "create");
+        setMessage(status.pinSet
+          ? "Parent login ready. Enter Eli's PIN."
+          : "Parent login ready. Create Eli's PIN on this device.");
+      } catch (error) {
+        if (!cancelled) setMessage(error.message || "Could not check Eli's profile.");
+      } finally {
+        if (!cancelled) setProfileLoading(false);
+      }
+    }
+    loadPinState();
+    return () => {
+      cancelled = true;
+    };
+  }, [authUser]);
 
   async function submitAuth(event, createAccount = false) {
     event.preventDefault();
@@ -31,9 +69,25 @@ export function LoginScreen({ onReady, onLocalOnly }) {
         ? await createParentAccount(email, password)
         : await signInParent(email, password);
       setAuthUser(user);
-      setMessage("Parent login ready. Enter Eli's PIN.");
+      setMessage("Parent login ready. Checking Eli PIN setup...");
     } catch (error) {
-      setMessage(error.message || "Login failed. Check the email and password.");
+      setMessage(error.message || "Login failed. Check the parent email and password.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleParentPasswordReset() {
+    if (!email.trim()) {
+      setMessage("Enter the parent email first.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await sendParentPasswordReset(email);
+      setMessage("Parent password reset email sent. Eli's PIN is not sent by email.");
+    } catch (error) {
+      setMessage(error.message || "Could not send the parent password reset email.");
     } finally {
       setBusy(false);
     }
@@ -42,11 +96,19 @@ export function LoginScreen({ onReady, onLocalOnly }) {
   async function submitPin(event) {
     event.preventDefault();
     if (!authUser) return;
+    if ((pinMode === "create" || pinMode === "reset") && pin !== confirmPin) {
+      setMessage("The two PIN boxes must match.");
+      return;
+    }
     setBusy(true);
-    setMessage("Checking Eli's profile...");
+    setMessage(pinMode === "enter" ? "Checking Eli's PIN..." : "Saving Eli's new PIN...");
 
     try {
-      const pinResult = await setOrVerifyEliPin(authUser.uid, pin);
+      const pinResult = pinMode === "create"
+        ? await createEliPin(authUser.uid, pin)
+        : pinMode === "reset"
+          ? await resetEliPin(authUser.uid, pin)
+          : await verifyEliPin(authUser.uid, pin);
       const remoteSaga = await loadRemoteSaga(authUser.uid);
       onReady({
         user: authUser,
@@ -66,11 +128,24 @@ export function LoginScreen({ onReady, onLocalOnly }) {
       await signOutParent();
       setAuthUser(null);
       setPin("");
+      setConfirmPin("");
+      setPinMode("enter");
       setMessage("Signed out. You can use the parent login again.");
     } finally {
       setBusy(false);
     }
   }
+
+  function switchPinMode(nextMode) {
+    setPin("");
+    setConfirmPin("");
+    setPinMode(nextMode);
+    setMessage(nextMode === "reset"
+      ? "Signed-in parent can create a new Eli PIN. The old PIN is not emailed."
+      : "Enter Eli's PIN.");
+  }
+
+  const pinDisabled = busy || profileLoading;
 
   return (
     <section className="saga-login" aria-label="Parent login">
@@ -100,7 +175,7 @@ export function LoginScreen({ onReady, onLocalOnly }) {
               />
             </label>
             <label>
-              Password
+              Parent password
               <input
                 autoComplete="current-password"
                 type="password"
@@ -121,6 +196,9 @@ export function LoginScreen({ onReady, onLocalOnly }) {
                 Create login
               </button>
             </div>
+            <button className="text-button" type="button" disabled={busy} onClick={handleParentPasswordReset}>
+              Reset parent password
+            </button>
           </form>
         ) : (
           <form className="saga-form" onSubmit={submitPin}>
@@ -128,6 +206,7 @@ export function LoginScreen({ onReady, onLocalOnly }) {
               <span>{authUser.email}</span>
               <button className="text-button" type="button" onClick={handleSignOut} disabled={busy}>Switch</button>
             </div>
+            <h2 className="pin-mode-title">{pinModeTitle(pinMode)}</h2>
             <label>
               Eli PIN
               <input
@@ -138,14 +217,41 @@ export function LoginScreen({ onReady, onLocalOnly }) {
                 onChange={(event) => setPin(event.target.value.replace(/\D/g, "").slice(0, 6))}
                 minLength={4}
                 required
+                disabled={pinDisabled}
               />
             </label>
-            <button className="primary" type="submit" disabled={busy}>Unlock Eli profile</button>
+            {pinMode === "create" || pinMode === "reset" ? (
+              <label>
+                Confirm Eli PIN
+                <input
+                  autoComplete="off"
+                  inputMode="numeric"
+                  type="password"
+                  value={confirmPin}
+                  onChange={(event) => setConfirmPin(event.target.value.replace(/\D/g, "").slice(0, 6))}
+                  minLength={4}
+                  required
+                  disabled={pinDisabled}
+                />
+              </label>
+            ) : null}
+            <button className="primary" type="submit" disabled={pinDisabled}>
+              {pinModeTitle(pinMode)}
+            </button>
+            {pinMode === "enter" ? (
+              <button className="text-button" type="button" disabled={pinDisabled} onClick={() => switchPinMode("reset")}>
+                Reset Eli PIN
+              </button>
+            ) : (
+              <button className="text-button" type="button" disabled={pinDisabled} onClick={() => switchPinMode("enter")}>
+                Enter existing PIN
+              </button>
+            )}
           </form>
         )}
 
         <button className="welcome-link" type="button" onClick={onLocalOnly} disabled={busy}>
-          Continue on this browser
+          Continue on this browser (local save only)
         </button>
       </div>
     </section>

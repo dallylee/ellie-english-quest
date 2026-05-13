@@ -84,7 +84,11 @@ export const v2AssetManifest = {
     "Expressive Luma orb",
     "Cloud Harbor dock and task objects",
     "Breakfast Breeze picnic island and task objects",
-    "Cloud Compass and Sunberry Basket rewards",
+    "School Star Observatory dome, telescope, clock, school props, constellations and task objects",
+    "Rhythm Cloud Stage concert stage, microphone, rhythm pads, thunder puff, music notes and task objects",
+    "London Wind Gate travel scene, red bus cloud, clock tower, ticket booth, river bridge and task objects",
+    "Storm Crown Citadel locked future map marker and reward symbol metadata",
+    "Cloud Compass, Sunberry Basket, Star Map Lens, Thunder Drum, Red Bus Ticket and locked Storm Crown Key reward metadata",
     "Fullscreen game HUD and menu surfaces"
   ]
 };

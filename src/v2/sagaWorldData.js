@@ -244,6 +244,434 @@ const breakfastBreezeTasks = [
   }
 ];
 
+const schoolStarObservatoryTasks = [
+  {
+    id: "open-the-observatory-dome",
+    title: "Open the Observatory Dome",
+    screenObject: "closed dome roof with moon latch",
+    objectKey: "observatory-dome",
+    lumaLine: "The stars cannot come in. Say: Open the star roof, please.",
+    expectedAnswer: "Open the star roof, please.",
+    targetWords: ["open", "star", "roof", "please"],
+    successAnimation: "Dome petals open and stars drift in.",
+    gentleHint: "Ask the star roof to open.",
+    mood: "thinking",
+    rewardEvent: "dome-open"
+  },
+  {
+    id: "wake-the-blue-telescope",
+    title: "Wake the Blue Telescope",
+    screenObject: "large blue telescope looking down",
+    objectKey: "blue-telescope",
+    lumaLine: "The telescope is looking the wrong way. Say: Telescope, find the English star.",
+    expectedAnswer: "Telescope, find the English star.",
+    targetWords: ["telescope", "English", "star"],
+    successAnimation: "Telescope turns toward a bright English star.",
+    gentleHint: "Say English star.",
+    mood: "happy",
+    rewardEvent: "telescope-wake"
+  },
+  {
+    id: "set-the-star-clock",
+    title: "Set the Star Clock",
+    screenObject: "floating clock with missing number nine",
+    objectKey: "star-clock",
+    lumaLine: "The star clock is lost. Say: School starts at nine.",
+    expectedAnswer: "School starts at nine.",
+    targetWords: ["school", "starts", "nine"],
+    successAnimation: "Number nine pops into the clock and bells sparkle.",
+    gentleHint: "Use school, starts and nine.",
+    mood: "thinking",
+    rewardEvent: "clock-nine"
+  },
+  {
+    id: "pack-the-magic-bag",
+    title: "Pack the Magic Bag",
+    screenObject: "open school bag with book, pencil and star",
+    objectKey: "magic-bag",
+    lumaLine: "The bag needs one book. Say: Put the book in my bag.",
+    expectedAnswer: "Put the book in my bag.",
+    targetWords: ["put", "book", "bag"],
+    successAnimation: "Book jumps into the bag and the bag grows tiny wings.",
+    gentleHint: "Say book in my bag.",
+    mood: "surprised",
+    rewardEvent: "book-packed"
+  },
+  {
+    id: "find-the-pencil-star",
+    title: "Find the Pencil Star",
+    screenObject: "pencil-shaped star hiding behind a cloud desk",
+    objectKey: "pencil-star",
+    lumaLine: "Tell Luma where it is. Say: The pencil is behind the cloud.",
+    expectedAnswer: "The pencil is behind the cloud.",
+    targetWords: ["pencil", "behind", "cloud"],
+    successAnimation: "Cloud desk moves aside and pencil star flies to the board.",
+    gentleHint: "Use behind the cloud.",
+    mood: "thinking",
+    rewardEvent: "pencil-found"
+  },
+  {
+    id: "draw-the-star-path",
+    title: "Draw the Star Path",
+    screenObject: "sky blackboard with dotted route",
+    objectKey: "star-path-board",
+    lumaLine: "Help me draw the path. Say: Draw a line to the star.",
+    expectedAnswer: "Draw a line to the star.",
+    targetWords: ["draw", "line", "star"],
+    successAnimation: "Glowing line draws itself across the board.",
+    gentleHint: "Say draw a line.",
+    mood: "happy",
+    rewardEvent: "path-drawn"
+  },
+  {
+    id: "shine-the-star-map-lens",
+    title: "Shine the Star Map Lens",
+    screenObject: "lens covered in grey dust",
+    objectKey: "star-map-lens",
+    lumaLine: "Clean it with words. Say: The lens is shiny now.",
+    expectedAnswer: "The lens is shiny now.",
+    targetWords: ["lens", "shiny", "now"],
+    successAnimation: "Dust blows away and the lens sends a beam to the sky.",
+    gentleHint: "Say shiny lens.",
+    mood: "surprised",
+    rewardEvent: "lens-shine"
+  },
+  {
+    id: "read-the-star-clue",
+    title: "Read the Star Clue",
+    screenObject: "star clue floating above the telescope",
+    objectKey: "star-clue",
+    lumaLine: "Read the clue with me. Say: The next island is singing.",
+    expectedAnswer: "The next island is singing.",
+    targetWords: ["next", "island", "singing"],
+    successAnimation: "Star clue turns into a music note bridge signal.",
+    gentleHint: "Say next island singing.",
+    mood: "proud",
+    rewardEvent: "music-bridge-signal"
+  }
+];
+
+const rhythmCloudStageTasks = [
+  {
+    id: "turn-on-the-stage-lights",
+    title: "Turn On the Stage Lights",
+    screenObject: "four sleepy stage lights",
+    objectKey: "stage-lights",
+    lumaLine: "The show needs light. Say: Lights on, please.",
+    expectedAnswer: "Lights on, please.",
+    targetWords: ["lights", "on", "please"],
+    successAnimation: "Lights pop on one at a time.",
+    gentleHint: "Say lights on, please.",
+    mood: "thinking",
+    rewardEvent: "stage-lights-on"
+  },
+  {
+    id: "wake-the-microphone",
+    title: "Wake the Microphone",
+    screenObject: "glowing microphone with closed eyes",
+    objectKey: "glowing-microphone",
+    lumaLine: "Tell the mic what you can do. Say: I can sing.",
+    expectedAnswer: "I can sing.",
+    targetWords: ["can", "sing"],
+    successAnimation: "Microphone wakes and sends a sound ripple.",
+    gentleHint: "Say I can sing.",
+    mood: "happy",
+    rewardEvent: "microphone-awake"
+  },
+  {
+    id: "clap-the-cloud-beat",
+    title: "Clap the Cloud Beat",
+    screenObject: "three rhythm pads on the floor",
+    objectKey: "rhythm-pads",
+    lumaLine: "Make a tiny beat. Say: I can clap the beat.",
+    expectedAnswer: "I can clap the beat.",
+    targetWords: ["can", "clap", "beat"],
+    successAnimation: "Rhythm pads bounce in sequence.",
+    gentleHint: "Use clap and beat.",
+    mood: "happy",
+    rewardEvent: "cloud-beat"
+  },
+  {
+    id: "find-the-guitar-cloud",
+    title: "Find the Guitar Cloud",
+    screenObject: "guitar-shaped cloud hiding behind curtains",
+    objectKey: "guitar-cloud",
+    lumaLine: "Tell me the dance clue. Say: I like dancing.",
+    expectedAnswer: "I like dancing.",
+    targetWords: ["like", "dancing"],
+    successAnimation: "Curtain opens and guitar cloud strums itself.",
+    gentleHint: "Say I like dancing.",
+    mood: "surprised",
+    rewardEvent: "guitar-cloud-found"
+  },
+  {
+    id: "help-the-shy-thunder-puff",
+    title: "Help the Shy Thunder Puff",
+    screenObject: "small purple thunder puff behind a speaker",
+    objectKey: "thunder-puff",
+    lumaLine: "Make it feel safe. Say: You can join the show.",
+    expectedAnswer: "You can join the show.",
+    targetWords: ["join", "show"],
+    successAnimation: "Thunder puff smiles and joins the stage.",
+    gentleHint: "Say join the show.",
+    mood: "thinking",
+    rewardEvent: "thunder-puff-joins"
+  },
+  {
+    id: "start-the-tiny-show",
+    title: "Start the Tiny Show",
+    screenObject: "curtain star waiting above the stage",
+    objectKey: "curtain-star",
+    lumaLine: "Start the show with kind words. Say: Welcome to my show.",
+    expectedAnswer: "Welcome to my show.",
+    targetWords: ["welcome", "show"],
+    successAnimation: "Curtain star bursts into confetti.",
+    gentleHint: "Say welcome to my show.",
+    mood: "proud",
+    rewardEvent: "tiny-show-start"
+  },
+  {
+    id: "play-the-thunder-drum",
+    title: "Play the Thunder Drum",
+    screenObject: "round drum with cloud bolts",
+    objectKey: "thunder-drum",
+    lumaLine: "Play the magic drum. Say: Boom, boom, make a bridge.",
+    expectedAnswer: "Boom, boom, make a bridge.",
+    targetWords: ["boom", "make", "bridge"],
+    successAnimation: "Drum beats create bridge-shaped sound waves.",
+    gentleHint: "Say make a bridge.",
+    mood: "surprised",
+    rewardEvent: "thunder-drum-bridge"
+  },
+  {
+    id: "sing-to-the-wind-gate",
+    title: "Sing to the Wind Gate",
+    screenObject: "musical wind gate at the back of the stage",
+    objectKey: "musical-wind-gate",
+    lumaLine: "One last line for the gate. Say: The song shows the way.",
+    expectedAnswer: "The song shows the way.",
+    targetWords: ["song", "shows", "way"],
+    successAnimation: "Music notes fly into the map route.",
+    gentleHint: "Say song shows the way.",
+    mood: "proud",
+    rewardEvent: "song-route"
+  }
+];
+
+const londonWindGateTasks = [
+  {
+    id: "open-the-london-window",
+    title: "Open the London Window",
+    screenObject: "round window filled with fog",
+    objectKey: "london-window",
+    lumaLine: "The fog is hiding a place. Say: I can see London.",
+    expectedAnswer: "I can see London.",
+    targetWords: ["see", "London"],
+    successAnimation: "Fog clears and the skyline appears.",
+    gentleHint: "Say I can see London.",
+    mood: "thinking",
+    rewardEvent: "london-window-clear"
+  },
+  {
+    id: "wake-big-ben",
+    title: "Wake Big Ben",
+    screenObject: "cute clock tower with sleepy clock face",
+    objectKey: "big-ben-tower",
+    lumaLine: "Name the tower clue. Say: I can see Big Ben.",
+    expectedAnswer: "I can see Big Ben.",
+    targetWords: ["see", "Big", "Ben"],
+    successAnimation: "Clock hands spin and ring softly.",
+    gentleHint: "Say Big Ben.",
+    mood: "happy",
+    rewardEvent: "big-ben-wake"
+  },
+  {
+    id: "fix-the-red-bus-cloud",
+    title: "Fix the Red Bus Cloud",
+    screenObject: "red bus with one missing wheel cloud",
+    objectKey: "red-bus-cloud",
+    lumaLine: "Tell the bus how we travel. Say: We can go by bus.",
+    expectedAnswer: "We can go by bus.",
+    targetWords: ["go", "bus"],
+    successAnimation: "Missing wheel cloud pops back on.",
+    gentleHint: "Say go by bus.",
+    mood: "thinking",
+    rewardEvent: "red-bus-fixed"
+  },
+  {
+    id: "find-the-ticket-booth",
+    title: "Find the Ticket Booth",
+    screenObject: "tiny ticket booth behind a wind swirl",
+    objectKey: "ticket-booth",
+    lumaLine: "Ask for a ticket kindly. Say: A ticket, please.",
+    expectedAnswer: "A ticket, please.",
+    targetWords: ["ticket", "please"],
+    successAnimation: "Ticket booth opens and a red ticket glows.",
+    gentleHint: "Say ticket, please.",
+    mood: "happy",
+    rewardEvent: "ticket-booth-open"
+  },
+  {
+    id: "turn-left-at-the-gate",
+    title: "Turn Left at the Gate",
+    screenObject: "wind arrow pointing left and right",
+    objectKey: "wind-arrows",
+    lumaLine: "Follow the arrow. Say: Turn left at the gate.",
+    expectedAnswer: "Turn left at the gate.",
+    targetWords: ["turn", "left", "gate"],
+    successAnimation: "Left arrow lights and the path rotates.",
+    gentleHint: "Use turn left.",
+    mood: "surprised",
+    rewardEvent: "left-gate-turn"
+  },
+  {
+    id: "cross-the-river-ribbon",
+    title: "Cross the River Ribbon",
+    screenObject: "blue river ribbon between clouds",
+    objectKey: "river-ribbon",
+    lumaLine: "Tell Luma where to go. Say: Go over the river.",
+    expectedAnswer: "Go over the river.",
+    targetWords: ["go", "over", "river"],
+    successAnimation: "Small cloud bridge crosses the river ribbon.",
+    gentleHint: "Say over the river.",
+    mood: "thinking",
+    rewardEvent: "river-bridge-cross"
+  },
+  {
+    id: "stamp-the-red-bus-ticket",
+    title: "Stamp the Red Bus Ticket",
+    screenObject: "ticket stamp machine with star stamp",
+    objectKey: "ticket-stamp",
+    lumaLine: "Make the ticket ready. Say: Stamp the ticket, please.",
+    expectedAnswer: "Stamp the ticket, please.",
+    targetWords: ["stamp", "ticket", "please"],
+    successAnimation: "Star stamp lands on the ticket with sparkles.",
+    gentleHint: "Say stamp the ticket.",
+    mood: "proud",
+    rewardEvent: "red-ticket-stamped"
+  },
+  {
+    id: "open-the-wind-gate",
+    title: "Open the Wind Gate",
+    screenObject: "tall gate with London wind symbols",
+    objectKey: "london-wind-gate",
+    lumaLine: "Use your travel spell. Say: London wind, open the way.",
+    expectedAnswer: "London wind, open the way.",
+    targetWords: ["London", "wind", "open", "way"],
+    successAnimation: "Gate opens and shows the storm citadel far away.",
+    gentleHint: "Say London wind, open the way.",
+    mood: "proud",
+    rewardEvent: "storm-route-open"
+  }
+];
+
+const stormCrownCitadelTasks = [
+  {
+    id: "name-the-storm-problem",
+    title: "Name the Storm Problem",
+    screenObject: "Storm crystal covering the crown symbol",
+    objectKey: "storm-crystal",
+    lumaLine: "Tell me the problem. Say: The storm is hiding the crown.",
+    expectedAnswer: "The storm is hiding the crown.",
+    targetWords: ["storm", "hiding", "crown"],
+    successAnimation: "Storm crystal shakes and becomes transparent.",
+    gentleHint: "Use storm, hiding and crown.",
+    mood: "thinking",
+    rewardEvent: "storm-crystal-clear"
+  },
+  {
+    id: "use-the-cloud-compass",
+    title: "Use the Cloud Compass",
+    screenObject: "Cloud Compass pedestal spinning wildly",
+    objectKey: "cloud-compass-pedestal",
+    lumaLine: "The compass is confused. Say: Compass, show the way.",
+    expectedAnswer: "Compass, show the way.",
+    targetWords: ["compass", "show", "way"],
+    successAnimation: "Compass points to the crown door.",
+    gentleHint: "Say compass, show the way.",
+    mood: "thinking",
+    rewardEvent: "compass-points"
+  },
+  {
+    id: "share-the-sunberry-basket",
+    title: "Share the Sunberry Basket",
+    screenObject: "Basket pedestal beside a hungry storm puff",
+    objectKey: "sunberry-basket-pedestal",
+    lumaLine: "The puff needs kindness. Say: Here is a sunberry.",
+    expectedAnswer: "Here is a sunberry.",
+    targetWords: ["sunberry"],
+    successAnimation: "Storm puff eats and changes from grey to gold.",
+    gentleHint: "Say sunberry.",
+    mood: "happy",
+    rewardEvent: "sunberry-kindness"
+  },
+  {
+    id: "shine-the-star-map-lens",
+    title: "Shine the Star Map Lens",
+    screenObject: "Star lens aimed at the wrong wall",
+    objectKey: "star-lens-pedestal",
+    lumaLine: "Aim the lens. Say: Shine on the door.",
+    expectedAnswer: "Shine on the door.",
+    targetWords: ["shine", "door"],
+    successAnimation: "Lens beam reveals crown runes.",
+    gentleHint: "Say shine on the door.",
+    mood: "surprised",
+    rewardEvent: "crown-runes"
+  },
+  {
+    id: "beat-the-thunder-drum",
+    title: "Beat the Thunder Drum",
+    screenObject: "Thunder drum waiting on a floating stone",
+    objectKey: "thunder-drum-pedestal",
+    lumaLine: "Make a brave beat. Say: The drum is strong.",
+    expectedAnswer: "The drum is strong.",
+    targetWords: ["drum", "strong"],
+    successAnimation: "Drum pulse clears dark clouds.",
+    gentleHint: "Say drum is strong.",
+    mood: "proud",
+    rewardEvent: "drum-clears-clouds"
+  },
+  {
+    id: "use-the-red-bus-ticket",
+    title: "Use the Red Bus Ticket",
+    screenObject: "Tiny red bus route across the storm",
+    objectKey: "red-bus-route",
+    lumaLine: "Tell the route what we will do. Say: We will go to the crown.",
+    expectedAnswer: "We will go to the crown.",
+    targetWords: ["will", "go", "crown"],
+    successAnimation: "Bus route lights and carries a sparkle to the door.",
+    gentleHint: "Use will, go and crown.",
+    mood: "happy",
+    rewardEvent: "bus-route-crown"
+  },
+  {
+    id: "pull-the-golden-lever",
+    title: "Pull the Golden Lever",
+    screenObject: "Golden lever beside the Crown Door",
+    objectKey: "golden-lever",
+    lumaLine: "Tell me your plan. Say: I will find the last clue.",
+    expectedAnswer: "I will find the last clue.",
+    targetWords: ["will", "find", "clue"],
+    successAnimation: "Lever lowers and Luma's memory star appears.",
+    gentleHint: "Say I will find the clue.",
+    mood: "thinking",
+    rewardEvent: "memory-star"
+  },
+  {
+    id: "open-the-crown-door",
+    title: "Open the Crown Door",
+    screenObject: "Huge Crown Door with all rewards glowing",
+    objectKey: "crown-door",
+    lumaLine: "Use your brave sentence. Say: I am brave and I can solve the mystery.",
+    expectedAnswer: "I am brave and I can solve the mystery.",
+    targetWords: ["brave", "can", "solve", "mystery"],
+    successAnimation: "Door opens, bridge network glows and Sky Islands celebration begins.",
+    gentleHint: "Say brave, solve mystery.",
+    mood: "proud",
+    rewardEvent: "sky-islands-complete"
+  }
+];
+
 const skyLevels = [
   {
     id: "cloud-harbor",
@@ -278,20 +706,11 @@ const skyLevels = [
     shortTitle: "School Stars",
     reward: "Star Map Lens",
     sceneType: "star-observatory",
-    implementationStatus: "locked-outline",
+    implementationStatus: "playable",
     color: "#8a8dff",
     position: skyIslandPositions[2],
-    intro: "The school stars are asleep inside a glass observatory.",
-    tasks: outlineTasks([
-      "Open the Observatory Dome",
-      "Wake the Blue Telescope",
-      "Set the Star Clock",
-      "Pack the Magic Bag",
-      "Find the Pencil Star",
-      "Draw the Star Path",
-      "Shine the Star Map Lens",
-      "Read the Star Clue"
-    ])
+    intro: "The school stars are asleep inside a glass observatory. Help Eli repair the Star Map Lens.",
+    tasks: schoolStarObservatoryTasks
   },
   {
     id: "rhythm-cloud-stage",
@@ -300,20 +719,11 @@ const skyLevels = [
     shortTitle: "Rhythm",
     reward: "Thunder Drum",
     sceneType: "cloud-stage",
-    implementationStatus: "locked-outline",
+    implementationStatus: "playable",
     color: "#ff83c6",
     position: skyIslandPositions[3],
-    intro: "The clouds have forgotten their song.",
-    tasks: outlineTasks([
-      "Turn On the Stage Lights",
-      "Wake the Microphone",
-      "Clap the Cloud Beat",
-      "Find the Guitar Cloud",
-      "Help the Shy Thunder Puff",
-      "Start the Tiny Show",
-      "Play the Thunder Drum",
-      "Sing to the Wind Gate"
-    ])
+    intro: "The clouds have forgotten their song. Help Eli wake the cute cloud concert.",
+    tasks: rhythmCloudStageTasks
   },
   {
     id: "london-wind-gate",
@@ -322,20 +732,11 @@ const skyLevels = [
     shortTitle: "London Gate",
     reward: "Red Bus Ticket",
     sceneType: "london-gate",
-    implementationStatus: "locked-outline",
-    color: "#61d394",
+    implementationStatus: "playable",
+    color: "#ff6b6b",
     position: skyIslandPositions[4],
-    intro: "A magical London gate spins in the clouds.",
-    tasks: outlineTasks([
-      "Open the London Window",
-      "Wake Big Ben",
-      "Fix the Red Bus Cloud",
-      "Find the Ticket Booth",
-      "Turn Left at the Gate",
-      "Cross the River Ribbon",
-      "Stamp the Red Bus Ticket",
-      "Open the Wind Gate"
-    ])
+    intro: "A magical London gate spins in the clouds. Follow the travel clues to find the Red Bus Ticket.",
+    tasks: londonWindGateTasks
   },
   {
     id: "storm-crown-citadel",
@@ -348,16 +749,7 @@ const skyLevels = [
     color: "#b180ff",
     position: skyIslandPositions[5],
     intro: "The soft storm is hiding the Crown Door.",
-    tasks: outlineTasks([
-      "Name the Storm Problem",
-      "Use the Cloud Compass",
-      "Share the Sunberry Basket",
-      "Shine the Star Map Lens",
-      "Beat the Thunder Drum",
-      "Use the Red Bus Ticket",
-      "Pull the Golden Lever",
-      "Open the Crown Door"
-    ])
+    tasks: stormCrownCitadelTasks
   }
 ];
 

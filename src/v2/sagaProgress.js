@@ -144,9 +144,6 @@ export function completeTask(saga, worldId, levelId, taskId) {
       nextSaga.unlockedLevelIdsByWorld[worldId] = unique([...nextSaga.unlockedLevelIdsByWorld[worldId], nextLevel.id]);
       nextSaga.currentLevelId = nextLevel.id;
       unlockedNextLevel = nextLevel;
-    } else if (world.id === "sky-islands") {
-      nextSaga.sagaUnlocks = { ...(nextSaga.sagaUnlocks || {}), crystalMystery: true };
-      nextSaga.unlockedWorldIds = unique([...nextSaga.unlockedWorldIds, "crystal-mystery"]);
     } else if (world.id === "crystal-mystery") {
       nextSaga.sagaUnlocks = { ...(nextSaga.sagaUnlocks || {}), timePortalCase: true };
       nextSaga.unlockedWorldIds = unique([...nextSaga.unlockedWorldIds, "time-portal-case"]);

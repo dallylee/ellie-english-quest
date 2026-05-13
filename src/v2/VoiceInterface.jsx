@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { createVoiceGuide } from "./voiceGuide.js";
+import { createVoiceGuide, getVoiceCompatibilityNote, QUIET_VOICE_MESSAGE } from "./voiceGuide.js";
 
 export function VoiceInterface({
   active,
@@ -43,13 +43,19 @@ export function VoiceInterface({
         mood: task.mood || "thinking",
         recentEvent: "task-start"
       });
-      await voiceGuide.playGuidePrompt(task.lumaLine, { mood: task.mood || "thinking" });
+      const promptVoice = await voiceGuide.playGuidePrompt(task.lumaLine, { mood: task.mood || "thinking" });
       if (cancelled || runIdRef.current !== runId) return;
+      if (!promptVoice.spoken) {
+        const compatibilityNote = getVoiceCompatibilityNote();
+        onCaptionChange?.(compatibilityNote ? `${QUIET_VOICE_MESSAGE} ${compatibilityNote}` : QUIET_VOICE_MESSAGE);
+        await new Promise((resolve) => window.setTimeout(resolve, 850));
+        if (cancelled || runIdRef.current !== runId) return;
+      }
 
       for (let attempt = 0; attempt < 2; attempt += 1) {
         onMoodChange?.("listening");
         onVoiceActivityChange?.("listening");
-        const result = await voiceGuide.listenForAnswer({ timeoutMs: 9000 });
+        const result = await voiceGuide.listenForAnswer({ timeoutMs: 9000, taskId: task.id });
         if (cancelled || runIdRef.current !== runId) return;
 
         const transcript = result.transcript || "";
@@ -72,6 +78,7 @@ export function VoiceInterface({
           setFallbackVisible(false);
           onMoodChange?.("proud");
           onVoiceActivityChange?.("reward");
+          voiceGuide.stopSession("task-success");
           onCorrect?.({
             provider: result.provider,
             transientTranscript: transcript,
@@ -86,7 +93,12 @@ export function VoiceInterface({
           onCaptionChange?.(hintLine);
           onMoodChange?.("sad");
           onVoiceActivityChange?.("orb-speaking");
-          await voiceGuide.playGuidePrompt(hintLine, { mood: "sad" });
+          const hintVoice = await voiceGuide.playGuidePrompt(hintLine, { mood: "sad" });
+          if (!hintVoice.spoken) {
+            const compatibilityNote = getVoiceCompatibilityNote();
+            onCaptionChange?.(compatibilityNote ? `${QUIET_VOICE_MESSAGE} ${compatibilityNote}` : QUIET_VOICE_MESSAGE);
+            await new Promise((resolve) => window.setTimeout(resolve, 850));
+          }
           if (cancelled || runIdRef.current !== runId) return;
         } else {
           setFallbackVisible(true);
@@ -101,7 +113,7 @@ export function VoiceInterface({
 
     return () => {
       cancelled = true;
-      voiceGuide.stopSession();
+      voiceGuide.stopSession("voice-interface-cleanup");
       onVoiceActivityChange?.("idle");
     };
   }, [
@@ -123,7 +135,7 @@ export function VoiceInterface({
 
   function completeWithFallback() {
     if (!task) return;
-    voiceGuide.stopSession();
+    voiceGuide.stopSession("fallback-tap");
     setFallbackVisible(false);
     setTransientTranscript("");
     onMoodChange?.("proud");
