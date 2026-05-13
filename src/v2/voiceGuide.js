@@ -464,8 +464,11 @@ function extractAudioChunksFromValue(value, chunks = []) {
   return chunks;
 }
 
-function parseWebSocketMessage(data) {
+async function parseWebSocketMessage(data) {
   if (typeof data === "string") return JSON.parse(data);
+  if (data instanceof ArrayBuffer) return JSON.parse(new TextDecoder().decode(data));
+  if (ArrayBuffer.isView(data)) return JSON.parse(new TextDecoder().decode(data));
+  if (typeof Blob !== "undefined" && data instanceof Blob) return JSON.parse(await data.text());
   throw new Error("Voice proxy returned non-JSON WebSocket data");
 }
 
@@ -529,9 +532,9 @@ export function createVoiceGuide({ voiceEnabled = true } = {}) {
     turnRejecter = null;
   }
 
-  function handleLiveMessage(event) {
+  async function handleLiveMessage(event) {
     try {
-      const message = parseWebSocketMessage(event.data);
+      const message = await parseWebSocketMessage(event.data);
       if (message.error) {
         throw new Error(`Gemini proxy error: ${sanitizeDiagnosticError(message.error)}`);
       }
@@ -624,6 +627,7 @@ export function createVoiceGuide({ voiceEnabled = true } = {}) {
       lastGeminiAudioChunks: 0
     });
     socket = new WebSocket(VOICE_PROXY_URL);
+    socket.binaryType = "arraybuffer";
     socket.onmessage = handleLiveMessage;
     socket.onerror = () => {
       updateVoiceDebug({ geminiStatus: "failed", lastGeminiError: "Gemini Live socket error" });

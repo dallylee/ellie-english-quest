@@ -10,3 +10,6 @@ reports/
 .wrangler/
 .wrangler-dry-run/
 *.log
+
+.vercel
+.env*.local
