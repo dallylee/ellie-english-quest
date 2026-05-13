@@ -159,6 +159,7 @@ function VoiceDebugPanel({ activeTaskId, voiceActivity }) {
       <span>activity: {voiceActivity}</span>
       <span>speech synthesis: {diagnostics.speechSynthesisSupported ? "supported" : "unsupported"}</span>
       <span>tts: {diagnostics.lastTtsProvider || "none"} / {diagnostics.lastTtsSpoken ? "played" : diagnostics.lastTtsError || "pending"}</span>
+      <span>voice mode: {diagnostics.voiceMode || "none"}</span>
       <span>browser tts fallback: {diagnostics.browserTtsFallbackUsed ? "used" : "not used"}</span>
       <span>quiet fallback: {diagnostics.quietFallbackUsed ? "shown" : "no"}</span>
       <span>last tts error: {diagnostics.lastTtsError || "none"}</span>
@@ -170,7 +171,12 @@ function VoiceDebugPanel({ activeTaskId, voiceActivity }) {
       <span>permission: {diagnostics.permissionRequestAttempted ? "attempted" : "not yet"}</span>
       <span>getUserMedia: {diagnostics.getUserMediaInvoked ? "yes" : "no"}</span>
       <span>recognition: {diagnostics.speechRecognitionInvoked ? "yes" : "no"}</span>
+      <span>gemini status: {diagnostics.geminiStatus || "not attempted"}</span>
       <span>gemini: {diagnostics.geminiConnected ? "connected" : diagnostics.lastGeminiError || "not connected"}</span>
+      <span>worker: {diagnostics.geminiWorkerReachable === null ? "unknown" : diagnostics.geminiWorkerReachable ? "reachable" : "not reachable"} / {diagnostics.geminiWorkerStatus || "none"}</span>
+      <span>worker websocket: {diagnostics.geminiWorkerWebSocketAvailable === null ? "unknown" : diagnostics.geminiWorkerWebSocketAvailable ? "available" : "unavailable"}</span>
+      <span>gemini key: {diagnostics.geminiKeyConfigured === null ? "unknown" : diagnostics.geminiKeyConfigured ? "configured" : "missing"}</span>
+      <span>gemini chunks: {diagnostics.lastGeminiAudioChunks || 0}</span>
       <span>audio: {diagnostics.audioContextUnlocked ? "unlocked" : "unknown"}</span>
     </aside>
   );

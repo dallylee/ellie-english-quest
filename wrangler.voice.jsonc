@@ -1,0 +1,9 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "lucky-dawn-d422",
+  "main": "workers/gemini-voice-proxy.js",
+  "compatibility_date": "2026-05-13",
+  "observability": {
+    "enabled": true
+  }
+}

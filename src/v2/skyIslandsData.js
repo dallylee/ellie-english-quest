@@ -1,6 +1,7 @@
 export const END_GAME_VIDEO_SRC = "/assets/videos/end_game_animation.mp4";
 export const NEW_ADVENTURE_CTA = "ELI, ARE YOU READY FOR NEW ADVENTURE - CLICK HERE";
 export const VOICE_PROXY_URL = "wss://lucky-dawn-d422.dallyzg.workers.dev";
+export const VOICE_PROXY_HEALTH_URL = "https://lucky-dawn-d422.dallyzg.workers.dev/health";
 
 export const sagaGames = [
   {

@@ -6,11 +6,14 @@ import {
   speakAsync,
   stopSpeaking
 } from "../lib/speech.js";
-import { VOICE_PROXY_URL } from "./skyIslandsData.js";
+import { VOICE_PROXY_HEALTH_URL, VOICE_PROXY_URL } from "./skyIslandsData.js";
 
-const LIVE_MODEL = "models/gemini-2.0-flash-exp";
+const LIVE_MODEL = "models/gemini-3.1-flash-live-preview";
 const AUDIO_RESPONSE_MODALITIES = ["AUDIO"];
 const OUTPUT_SAMPLE_RATE = 24000;
+const GEMINI_CONNECT_TIMEOUT_MS = 1400;
+const GEMINI_SETUP_TIMEOUT_MS = 7000;
+const GEMINI_TURN_TIMEOUT_MS = 9000;
 export const QUIET_VOICE_MESSAGE = "Luma voice is quiet on this device. Read with me.";
 
 const voiceDebugState = {
@@ -26,7 +29,14 @@ const voiceDebugState = {
   lastTtsError: null,
   lastSttError: null,
   geminiConnected: false,
+  geminiStatus: "not attempted",
+  geminiWorkerReachable: null,
+  geminiWorkerStatus: null,
+  geminiWorkerWebSocketAvailable: null,
+  geminiKeyConfigured: null,
   lastGeminiError: null,
+  voiceMode: "none",
+  lastGeminiAudioChunks: 0,
   browserTtsFallbackUsed: false,
   quietFallbackUsed: false,
   lastPrimeReason: null
@@ -36,6 +46,41 @@ let activeListen = null;
 
 function updateVoiceDebug(patch) {
   Object.assign(voiceDebugState, patch);
+}
+
+function isVoiceDebugEnabled() {
+  if (typeof window === "undefined") return false;
+  return new URLSearchParams(window.location.search).get("debugVoice") === "1";
+}
+
+function sanitizeDiagnosticError(value) {
+  return String(value || "")
+    .replace(/AIza[0-9A-Za-z_-]{20,}/g, "[REDACTED_GOOGLE_KEY]")
+    .replace(/([?&]key=)[^&\s"')]+/gi, "$1[REDACTED]")
+    .replace(/sk-[A-Za-z0-9_-]{20,}/g, "[REDACTED_API_KEY]")
+    .slice(0, 360);
+}
+
+async function refreshWorkerHealthIfDebug() {
+  if (!isVoiceDebugEnabled() || typeof fetch === "undefined") return;
+  updateVoiceDebug({ geminiWorkerStatus: "checking" });
+  try {
+    const response = await fetch(VOICE_PROXY_HEALTH_URL, { cache: "no-store" });
+    const body = await response.json().catch(() => ({}));
+    updateVoiceDebug({
+      geminiWorkerReachable: response.ok && Boolean(body.workerReachable),
+      geminiWorkerStatus: response.status,
+      geminiWorkerWebSocketAvailable: Boolean(body.webSocketRouteAvailable),
+      geminiKeyConfigured: typeof body.geminiKeyConfigured === "boolean" ? body.geminiKeyConfigured : null,
+      lastGeminiError: body.lastUpstreamError ? sanitizeDiagnosticError(body.lastUpstreamError) : voiceDebugState.lastGeminiError
+    });
+  } catch (error) {
+    updateVoiceDebug({
+      geminiWorkerReachable: false,
+      geminiWorkerStatus: "health-error",
+      lastGeminiError: sanitizeDiagnosticError(error?.message || "Worker health check failed")
+    });
+  }
 }
 
 function resetVoiceDebugForTask(taskId) {
@@ -117,7 +162,14 @@ function buildLiveSetup({ mood }) {
     setup: {
       model: LIVE_MODEL,
       generationConfig: {
-        responseModalities: AUDIO_RESPONSE_MODALITIES
+        responseModalities: AUDIO_RESPONSE_MODALITIES,
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: {
+              voiceName: "Kore"
+            }
+          }
+        }
       },
       systemInstruction: {
         parts: [
@@ -426,6 +478,8 @@ export function createVoiceGuide({ voiceEnabled = true } = {}) {
   let turnRejecter = null;
   let setupTimer = null;
   let turnTimer = null;
+  let geminiConnectPromise = null;
+  let sessionToken = 0;
   let activeWorld = null;
   let activeLevel = null;
   let activeTask = null;
@@ -454,8 +508,9 @@ export function createVoiceGuide({ voiceEnabled = true } = {}) {
   }
 
   function rejectPending(error) {
-    setupRejecter?.(error);
-    turnRejecter?.(error);
+    const safeError = error instanceof Error ? error : new Error(sanitizeDiagnosticError(error?.message || error || "Gemini Live error"));
+    setupRejecter?.(safeError);
+    turnRejecter?.(safeError);
     setupRejecter = null;
     turnRejecter = null;
   }
@@ -477,6 +532,9 @@ export function createVoiceGuide({ voiceEnabled = true } = {}) {
   function handleLiveMessage(event) {
     try {
       const message = parseWebSocketMessage(event.data);
+      if (message.error) {
+        throw new Error(`Gemini proxy error: ${sanitizeDiagnosticError(message.error)}`);
+      }
       if (message.setupComplete) {
         window.clearTimeout(setupTimer);
         setupTimer = null;
@@ -495,6 +553,7 @@ export function createVoiceGuide({ voiceEnabled = true } = {}) {
       for (const chunk of audioChunks) {
         if (liveAudio.enqueuePcm(chunk.data, chunk.mimeType)) {
           audioChunkCount += 1;
+          updateVoiceDebug({ lastGeminiAudioChunks: audioChunkCount });
         }
       }
       resolveTurnIfReady(message);
@@ -509,7 +568,7 @@ export function createVoiceGuide({ voiceEnabled = true } = {}) {
       setupRejecter = reject;
       setupTimer = window.setTimeout(() => {
         reject(new Error("Gemini Live setup timed out"));
-      }, 9000);
+      }, GEMINI_SETUP_TIMEOUT_MS);
     });
   }
 
@@ -518,32 +577,80 @@ export function createVoiceGuide({ voiceEnabled = true } = {}) {
       turnResolver = resolve;
       turnRejecter = reject;
       turnTimer = window.setTimeout(() => {
+        if (audioChunkCount > 0) {
+          resolve({
+            provider: "gemini-live",
+            spoken: true,
+            audioChunkCount,
+            timedOutAfterAudio: true
+          });
+          turnResolver = null;
+          turnRejecter = null;
+          return;
+        }
         reject(new Error("Gemini Live audio timed out"));
-      }, 18000);
+      }, GEMINI_TURN_TIMEOUT_MS);
     });
   }
 
-  async function connectLiveSocket() {
+  async function waitForGeminiReady(timeoutMs = GEMINI_CONNECT_TIMEOUT_MS) {
+    if (session?.provider === "gemini-live" && socket?.readyState === WebSocket.OPEN) return session;
+    if (!geminiConnectPromise) return null;
+    let timedOut = false;
+    const timeoutPromise = new Promise((resolve) => {
+      window.setTimeout(() => {
+        timedOut = true;
+        resolve(null);
+      }, timeoutMs);
+    });
+    const result = await Promise.race([
+      geminiConnectPromise.then((connectedSession) => connectedSession).catch(() => null),
+      timeoutPromise
+    ]);
+    if (!result && timedOut && voiceDebugState.geminiStatus === "connecting") {
+      updateVoiceDebug({ geminiStatus: "timeout", lastGeminiError: "Gemini Live connection timed out; browser TTS fallback used." });
+    }
+    return result;
+  }
+
+  async function connectLiveSocket(token) {
     cleanupSocket();
     await liveAudio.resume();
+    if (token !== sessionToken) throw new Error("Gemini Live session was superseded");
+    updateVoiceDebug({
+      geminiConnected: false,
+      geminiStatus: "connecting",
+      lastGeminiError: null,
+      lastGeminiAudioChunks: 0
+    });
     socket = new WebSocket(VOICE_PROXY_URL);
     socket.onmessage = handleLiveMessage;
-    socket.onerror = () => rejectPending(new Error("Gemini Live socket error"));
+    socket.onerror = () => {
+      updateVoiceDebug({ geminiStatus: "failed", lastGeminiError: "Gemini Live socket error" });
+      rejectPending(new Error("Gemini Live socket error"));
+    };
     socket.onclose = (event) => {
-      if (event.code !== 1000) rejectPending(new Error(`Gemini Live socket closed: ${event.code}`));
+      if (event.code !== 1000) {
+        const message = sanitizeDiagnosticError(`Gemini Live socket closed: ${event.code} ${event.reason || ""}`);
+        updateVoiceDebug({ geminiStatus: "failed", geminiConnected: false, lastGeminiError: message });
+        rejectPending(new Error(message));
+      }
     };
 
     const setupPromise = waitForSetup();
     socket.onopen = () => {
+      updateVoiceDebug({ geminiStatus: "connecting", geminiWorkerStatus: "websocket-open" });
       socket.send(JSON.stringify(buildLiveSetup({ mood: activeMood })));
     };
 
     await setupPromise;
+    if (token !== sessionToken) throw new Error("Gemini Live session was superseded");
     session = {
       provider: "gemini-live",
       model: LIVE_MODEL,
       socketState: "open"
     };
+    updateVoiceDebug({ geminiConnected: true, geminiStatus: "connected", lastGeminiError: null });
     return session;
   }
 
@@ -558,44 +665,61 @@ export function createVoiceGuide({ voiceEnabled = true } = {}) {
       activeTask = task || clue || null;
       activeRecentEvent = recentEvent;
       activeMood = mood;
+      const token = sessionToken + 1;
+      sessionToken = token;
       resetVoiceDebugForTask(activeTask?.id || null);
+      refreshWorkerHealthIfDebug();
 
       if (!voiceEnabled) {
         session = {
           provider: "silent",
           uid: uid || null
         };
+        updateVoiceDebug({ voiceMode: "none" });
         return session;
       }
 
       primeVoice("voice-session");
+      updateVoiceDebug({
+        geminiStatus: "connecting",
+        voiceMode: "none",
+        lastGeminiAudioChunks: 0
+      });
       session = {
         provider: "browser-fallback",
         reason: "Browser voice is ready while Gemini warms up.",
         uid: uid || null
       };
 
-      connectLiveSocket()
+      geminiConnectPromise = connectLiveSocket(token)
         .then(() => {
-          updateVoiceDebug({ geminiConnected: true, lastGeminiError: null });
+          if (token !== sessionToken) return null;
+          updateVoiceDebug({ geminiConnected: true, geminiStatus: "connected", lastGeminiError: null });
+          return session;
         })
         .catch((error) => {
+          if (token !== sessionToken) return null;
           cleanupSocket();
+          const safeError = sanitizeDiagnosticError(error?.message || "Gemini Live unavailable");
           updateVoiceDebug({
             geminiConnected: false,
-            lastGeminiError: error?.message || "Gemini Live unavailable"
+            geminiStatus: "failed",
+            lastGeminiError: safeError
           });
           session = {
             provider: "browser-fallback",
-            reason: error?.message || "Gemini Live unavailable",
+            reason: safeError,
             uid: uid || null
           };
+          return null;
         });
 
       return session;
     },
 
     stopSession(reason = "session-stop") {
+      sessionToken += 1;
+      geminiConnectPromise = null;
       stopActiveRecognition(reason);
       cleanupSocket();
       liveAudio.stop();
@@ -604,11 +728,17 @@ export function createVoiceGuide({ voiceEnabled = true } = {}) {
     },
 
     async playGuidePrompt(prompt, { mood = "happy" } = {}) {
-      if (!voiceEnabled) return { provider: "silent", spoken: false };
+      if (!voiceEnabled) {
+        updateVoiceDebug({ voiceMode: "none" });
+        return { provider: "silent", spoken: false };
+      }
+
+      await waitForGeminiReady();
 
       if (session?.provider === "gemini-live" && socket?.readyState === WebSocket.OPEN) {
         try {
           audioChunkCount = 0;
+          updateVoiceDebug({ lastGeminiAudioChunks: 0 });
           const turnPromise = waitForTurn();
           socket.send(JSON.stringify(buildClientContent({
             prompt,
@@ -625,6 +755,9 @@ export function createVoiceGuide({ voiceEnabled = true } = {}) {
               lastTtsSpoken: true,
               lastTtsError: null,
               lastGeminiError: null,
+              geminiStatus: "connected",
+              voiceMode: "gemini-audio",
+              lastGeminiAudioChunks: liveResult.audioChunkCount || audioChunkCount,
               browserTtsFallbackUsed: false,
               quietFallbackUsed: false
             });
@@ -634,12 +767,15 @@ export function createVoiceGuide({ voiceEnabled = true } = {}) {
         } catch (error) {
           cleanupSocket();
           liveAudio.stop();
-          session = { provider: "browser-fallback", reason: error?.message || "Gemini Live playback failed" };
+          const safeError = sanitizeDiagnosticError(error?.message || "Gemini Live playback failed");
+          session = { provider: "browser-fallback", reason: safeError };
           updateVoiceDebug({
+            geminiStatus: "failed",
+            geminiConnected: false,
             lastTtsProvider: "gemini-live",
             lastTtsSpoken: false,
-            lastTtsError: session.reason,
-            lastGeminiError: session.reason
+            lastTtsError: safeError,
+            lastGeminiError: safeError
           });
         }
       }
@@ -649,6 +785,7 @@ export function createVoiceGuide({ voiceEnabled = true } = {}) {
         lastTtsProvider: "browser-tts",
         lastTtsSpoken: Boolean(result.spoken),
         lastTtsError: result.error || null,
+        voiceMode: result.spoken ? "browser-tts" : "quiet-caption",
         browserTtsFallbackUsed: true,
         quietFallbackUsed: !result.spoken
       });

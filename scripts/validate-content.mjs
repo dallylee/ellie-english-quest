@@ -7,6 +7,7 @@ import { createDefaultProgress } from "../src/lib/storage.js";
 import {
   END_GAME_VIDEO_SRC,
   NEW_ADVENTURE_CTA,
+  VOICE_PROXY_HEALTH_URL,
   VOICE_PROXY_URL,
   orbMoods,
   sagaGames,
@@ -18,7 +19,7 @@ import { v2AssetManifest } from "../src/v2/assets/assetManifest.js";
 const errors = [];
 const ids = new Set();
 const rootDir = process.cwd();
-const sourceTextExtensions = new Set([".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs", ".html", ".css", ".json", ".md", ".svg"]);
+const sourceTextExtensions = new Set([".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs", ".html", ".css", ".json", ".jsonc", ".md", ".svg"]);
 const envFileNames = new Set([".env", ".env.local", ".env.production", ".env.development"]);
 
 function collectTextFiles(directory) {
@@ -64,24 +65,29 @@ const secretScanFiles = [
     .map((entry) => path.join(rootDir, entry.name)),
   ...collectSecretScanFiles("src"),
   ...collectSecretScanFiles("scripts"),
+  ...collectSecretScanFiles("workers"),
   ...collectSecretScanFiles("public"),
   ...collectSecretScanFiles("reports"),
-  ...collectSecretScanFiles("dist")
+  ...collectSecretScanFiles("dist"),
+  ...["wrangler.voice.jsonc"].filter((file) => fs.existsSync(path.join(rootDir, file)))
 ];
 
 for (const sourceFile of secretScanFiles) {
   const sourcePath = path.isAbsolute(sourceFile) ? sourceFile : path.join(rootDir, sourceFile);
   if (!fs.existsSync(sourcePath)) continue;
-  if (path.relative(rootDir, sourcePath) === path.join("scripts", "validate-content.mjs")) continue;
+  const relativeSourcePath = path.relative(rootDir, sourcePath);
+  if (relativeSourcePath === path.join("scripts", "validate-content.mjs")) continue;
+  const isWorkerSource = relativeSourcePath.startsWith(`workers${path.sep}`) || relativeSourcePath === "wrangler.voice.jsonc";
   const sourceText = fs.readFileSync(sourcePath, "utf8");
   for (const check of criticalSecretChecks) {
+    if (isWorkerSource && check.label === "Gemini Developer API key variable") continue;
     if (check.regex.test(sourceText)) {
-      errors.push(`Critical secret marker found in frontend/report/build file (${check.label}): ${path.relative(rootDir, sourcePath)}`);
+      errors.push(`Critical secret marker found in frontend/report/build file (${check.label}): ${relativeSourcePath}`);
     }
   }
   const googleKeyMatches = sourceText.match(/AIza[0-9A-Za-z_-]{20,}/g) || [];
   if (googleKeyMatches.length && !/firebase|firestore|authDomain|VITE_FIREBASE/i.test(sourceText)) {
-    errors.push(`Possible non-Firebase Google API key in frontend/report/build file: ${path.relative(rootDir, sourcePath)}`);
+    errors.push(`Possible non-Firebase Google API key in frontend/report/build file: ${relativeSourcePath}`);
   }
 }
 
@@ -734,6 +740,10 @@ if (VOICE_PROXY_URL !== "wss://lucky-dawn-d422.dallyzg.workers.dev") {
   errors.push("V2 voice proxy URL must use the current Cloudflare Worker WebSocket host");
 }
 
+if (VOICE_PROXY_HEALTH_URL !== "https://lucky-dawn-d422.dallyzg.workers.dev/health") {
+  errors.push("V2 voice proxy health URL must use the current Cloudflare Worker health endpoint");
+}
+
 const voiceGuideSource = fs.readFileSync(path.join(rootDir, "src", "v2", "voiceGuide.js"), "utf8");
 const sagaAppSource = fs.readFileSync(path.join(rootDir, "src", "v2", "SagaApp.jsx"), "utf8");
 for (const mood of ["happy", "thinking", "listening"]) {
@@ -748,6 +758,12 @@ if (!voiceGuideSource.includes("new WebSocket(VOICE_PROXY_URL)") || !voiceGuideS
 
 if (!voiceGuideSource.includes("responseModalities: AUDIO_RESPONSE_MODALITIES")) {
   errors.push("Voice guide Live setup must include responseModalities: ['AUDIO']");
+}
+
+for (const requiredSnippet of ["gemini-3.1-flash-live-preview", "GEMINI_CONNECT_TIMEOUT_MS", "refreshWorkerHealthIfDebug", "sanitizeDiagnosticError", "voiceMode"]) {
+  if (!voiceGuideSource.includes(requiredSnippet)) {
+    errors.push(`Voice guide missing Gemini repair diagnostic/fallback piece: ${requiredSnippet}`);
+  }
 }
 
 if (!voiceGuideSource.includes("serverContent") || !voiceGuideSource.includes("modelTurn") || !voiceGuideSource.includes("inlineData")) {
@@ -766,9 +782,27 @@ for (const requiredSnippet of ["QUIET_VOICE_MESSAGE", "activeListeningLock", "re
   }
 }
 
-for (const debugLabel of ["speech synthesis:", "browser tts fallback:", "quiet fallback:", "last tts error:", "last stt error:"]) {
+for (const debugLabel of ["speech synthesis:", "voice mode:", "gemini status:", "worker:", "worker websocket:", "gemini key:", "gemini chunks:", "browser tts fallback:", "quiet fallback:", "last tts error:", "last stt error:"]) {
   if (!sagaAppSource.includes(debugLabel)) {
     errors.push(`debugVoice panel missing ${debugLabel}`);
+  }
+}
+
+const workerSourcePath = path.join(rootDir, "workers", "gemini-voice-proxy.js");
+if (!fs.existsSync(workerSourcePath)) {
+  errors.push("Gemini voice proxy Worker source must be present");
+} else {
+  const workerSource = fs.readFileSync(workerSourcePath, "utf8");
+  for (const requiredSnippet of ["https://generativelanguage.googleapis.com/ws/", "Upgrade: \"websocket\"", "WebSocketPair", "GEMINI_API_KEY", "sanitizeError", "/health"]) {
+    if (!workerSource.includes(requiredSnippet)) {
+      errors.push(`Gemini voice proxy Worker missing required piece: ${requiredSnippet}`);
+    }
+  }
+  if (/wss:\/\/generativelanguage\.googleapis\.com/.test(workerSource)) {
+    errors.push("Gemini voice proxy Worker must not fetch a wss:// upstream URL in Cloudflare");
+  }
+  if (/AIza[0-9A-Za-z_-]{20,}/.test(workerSource)) {
+    errors.push("Gemini voice proxy Worker source must not contain a real Gemini API key");
   }
 }
 
