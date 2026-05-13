@@ -58,7 +58,7 @@ if (typeof window !== "undefined" && "speechSynthesis" in window) {
   });
 }
 
-export function speak(text, options = {}) {
+function speakWithDone(text, options = {}, onDone) {
   if (!("speechSynthesis" in window)) return false;
   const synth = window.speechSynthesis;
   const utterance = new SpeechSynthesisUtterance(text);
@@ -78,6 +78,7 @@ export function speak(text, options = {}) {
   };
   utterance.onend = utterance.onerror = () => {
     if (activeUtterance === utterance) activeUtterance = null;
+    onDone?.({ spoken: started });
   };
 
   activeUtterance = utterance;
@@ -88,10 +89,21 @@ export function speak(text, options = {}) {
   if (voice) {
     window.setTimeout(() => {
       if (started || activeUtterance !== utterance) return;
-      speak(text, { ...options, voice: null });
+      speakWithDone(text, { ...options, voice: null }, onDone);
     }, 850);
   }
   return true;
+}
+
+export function speak(text, options = {}) {
+  return speakWithDone(text, options);
+}
+
+export function speakAsync(text, options = {}) {
+  return new Promise((resolve) => {
+    const started = speakWithDone(text, options, resolve);
+    if (!started) resolve({ spoken: false });
+  });
 }
 
 export function stopSpeaking() {

@@ -6,6 +6,9 @@ import { loadProgress, saveProgress, resetProgress, recalcAndUnlock, starsFromSc
 
 const app = document.getElementById("app");
 const ELI_IMAGE = "/assets/images/eli.png";
+const END_GAME_VIDEO = "/assets/videos/end_game_animation.mp4";
+const HOME_NEW_ADVENTURE_CTA = "ELI, ARE YOU READY FOR NEW ADVENTURE - CLICK HERE";
+const DEBUG_V2_UNLOCK_KEY = "debug_v2_unlocked";
 const modeStarKeys = ["quizStars", "pictureStars", "memoryStars", "speakStars", "buildStars"];
 const CORRECT_ADVANCE_DELAY = 1150;
 
@@ -32,6 +35,7 @@ let ui = {
   buildFeedback: null,
   levelBurst: null
 };
+let sagaUnmount = null;
 
 function getLevel() {
   return levels.find((level) => level.id === ui.levelId) || levels[0];
@@ -74,6 +78,40 @@ function speakText(text, options) {
   if (!progress.settings?.voiceEnabled) return false;
   if (!("speechSynthesis" in window)) return false;
   return speak(speechNameText(text), options);
+}
+
+function clearSagaMount() {
+  if (!sagaUnmount) return;
+  sagaUnmount();
+  sagaUnmount = null;
+}
+
+function hasAllMagicRewardsUnlocked() {
+  return rewardMilestones.every((reward) => {
+    return progress.totalStars >= reward.stars || progress.trophies.includes(reward.title);
+  });
+}
+
+function hasDebugV2Unlock() {
+  return import.meta.env.DEV && sessionStorage.getItem(DEBUG_V2_UNLOCK_KEY) === "true";
+}
+
+function canOpenNewAdventure() {
+  return hasAllMagicRewardsUnlocked() || hasDebugV2Unlock();
+}
+
+function markNewAdventureReady({ persist = true } = {}) {
+  if (!persist) return;
+  progress.saga = {
+    ...(progress.saga || {}),
+    endVideoSeen: true,
+    newAdventureUnlocked: true
+  };
+  progress = saveProgress(progress);
+}
+
+function hasSeenNewAdventureVideo() {
+  return Boolean(progress.saga?.endVideoSeen) || hasDebugV2Unlock();
 }
 
 app.addEventListener("click", (event) => {
@@ -135,6 +173,7 @@ function autoAdvance(callback, delay = CORRECT_ADVANCE_DELAY) {
 }
 
 function page(title, body) {
+  clearSagaMount();
   app.innerHTML = `
     <div class="shell">
       ${magicDecor()}
@@ -193,6 +232,7 @@ function bindGlobalActions() {
 
 function render() {
   if (ui.screen === "home") return renderHome();
+  if (ui.screen === "saga") return renderSaga();
   if (ui.screen === "map") return renderMap();
   if (ui.screen === "level") return renderLevel();
   if (ui.screen === "quiz") return renderQuiz();
@@ -203,7 +243,43 @@ function render() {
   if (ui.screen === "trophies") return renderTrophies();
 }
 
+function renderEndGameVideo() {
+  clearSagaMount();
+  app.innerHTML = `
+    <div class="end-video-screen">
+      ${magicDecor()}
+      <main class="end-video-card">
+        <video class="end-game-video" src="${END_GAME_VIDEO}" autoplay playsinline controls></video>
+        <div class="end-video-actions">
+          <p class="eyebrow">Magic complete</p>
+          <h1>A new adventure is opening.</h1>
+          <button class="primary" id="endVideoContinue">Continue</button>
+        </div>
+      </main>
+    </div>
+  `;
+  const video = document.querySelector(".end-game-video");
+  const continueButton = document.getElementById("endVideoContinue");
+  const continueToHome = () => {
+    markNewAdventureReady({ persist: !hasDebugV2Unlock() });
+    playEffect("announcement");
+    renderHome();
+  };
+  video?.addEventListener("ended", continueToHome, { once: true });
+  continueButton.addEventListener("click", continueToHome);
+}
+
 function renderHome() {
+  if (canOpenNewAdventure() && !hasSeenNewAdventureVideo()) {
+    return renderEndGameVideo();
+  }
+
+  if (hasAllMagicRewardsUnlocked() && progress.saga?.endVideoSeen && !progress.saga?.newAdventureUnlocked) {
+    markNewAdventureReady();
+  }
+
+  clearSagaMount();
+  const showNewAdventure = Boolean(progress.saga?.newAdventureUnlocked) || hasDebugV2Unlock();
   app.innerHTML = `
     <div class="welcome-screen">
       ${magicDecor()}
@@ -221,6 +297,7 @@ function renderHome() {
         <p class="eyebrow">Bok, ${learnerProfile.displayName}</p>
         <h1>Magic English starts here.</h1>
         <p class="lead">Play games. Learn words. Win magic rewards.</p>
+        ${showNewAdventure ? `<button class="new-adventure-cta" id="newAdventureBtn">${HOME_NEW_ADVENTURE_CTA}</button>` : ""}
         <button class="start-spell" id="startBtn">START</button>
         <button class="welcome-link" id="trophyBtn">Trophy Room</button>
       </main>
@@ -234,10 +311,82 @@ function renderHome() {
     ui.screen = "map";
     render();
   });
+  document.getElementById("newAdventureBtn")?.addEventListener("click", () => {
+    playEffect("announcement");
+    ui.screen = "saga";
+    render();
+  });
   document.getElementById("trophyBtn").addEventListener("click", () => {
     ui.screen = "trophies";
     render();
   });
+}
+
+function renderSaga() {
+  if (!canOpenNewAdventure()) {
+    ui.screen = "home";
+    renderHome();
+    return;
+  }
+
+  clearSagaMount();
+  app.innerHTML = `
+    <div class="saga-loading">
+      <div class="orb-login-preview" aria-hidden="true">
+        <span class="orb-eye left"></span>
+        <span class="orb-eye right"></span>
+        <span class="orb-brow left"></span>
+        <span class="orb-brow right"></span>
+        <span class="orb-mouth smile"></span>
+      </div>
+      <p class="eyebrow">Loading</p>
+      <h1>Opening Sky Islands...</h1>
+    </div>
+  `;
+
+  import("./v2/SagaApp.jsx")
+    .then(({ mountSagaApp }) => {
+      if (ui.screen !== "saga") return;
+      sagaUnmount = mountSagaApp(app, {
+        initialProgress: progress,
+        debugMode: hasDebugV2Unlock(),
+        playEffect,
+        onProgressChange(nextProgress) {
+          if (hasDebugV2Unlock() && !hasAllMagicRewardsUnlocked()) {
+            progress = nextProgress;
+            return;
+          }
+          progress = saveProgress(nextProgress);
+        },
+        onExit() {
+          stopSpeaking();
+          clearSagaMount();
+          ui.screen = "home";
+          render();
+        }
+      });
+    })
+    .catch(() => {
+      app.innerHTML = `
+        <div class="saga-loading">
+          <h1>Sky Islands needs a refresh.</h1>
+          <button class="primary" id="backHomeAfterSagaError">Home</button>
+        </div>
+      `;
+      document.getElementById("backHomeAfterSagaError").addEventListener("click", () => {
+        ui.screen = "home";
+        render();
+      });
+    });
+}
+
+if (import.meta.env.DEV) {
+  window.debugUnlockV2 = () => {
+    sessionStorage.setItem(DEBUG_V2_UNLOCK_KEY, "true");
+    ui.screen = "home";
+    renderEndGameVideo();
+    return "V2 debug unlock active for this browser session only.";
+  };
 }
 
 function renderMap() {

@@ -1,5 +1,7 @@
 node_modules/
 dist/
+.superpowers/
+reports/
 .DS_Store
 .env
 *.log

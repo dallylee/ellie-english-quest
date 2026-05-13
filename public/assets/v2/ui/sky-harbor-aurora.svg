@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" preserveAspectRatio="none">
+  <defs>
+    <radialGradient id="sunGlow" cx="50%" cy="24%" r="48%">
+      <stop offset="0" stop-color="#fff5a6" stop-opacity=".75"/>
+      <stop offset=".48" stop-color="#baefff" stop-opacity=".24"/>
+      <stop offset="1" stop-color="#7b5cff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="aurora" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#9a7cff" stop-opacity=".32"/>
+      <stop offset=".45" stop-color="#55e4ff" stop-opacity=".2"/>
+      <stop offset="1" stop-color="#ffd45c" stop-opacity=".18"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="800" fill="url(#sunGlow)"/>
+  <path d="M-60 210C130 80 250 285 430 158c180-128 328-95 486 28 116 91 226 15 344-28v642H-60z" fill="url(#aurora)"/>
+  <path d="M0 680c112-54 230-50 350-14 166 49 292 30 434-24 142-55 278-43 416 24v134H0z" fill="#ffffff" opacity=".18"/>
+  <g fill="#fff8d8" opacity=".8">
+    <path d="M173 132h13v13h-13z" transform="rotate(45 179.5 138.5)"/>
+    <path d="M824 108h15v15h-15z" transform="rotate(45 831.5 115.5)"/>
+    <path d="M1022 248h10v10h-10z" transform="rotate(45 1027 253)"/>
+    <path d="M492 74h9v9h-9z" transform="rotate(45 496.5 78.5)"/>
+    <path d="M312 328h11v11h-11z" transform="rotate(45 317.5 333.5)"/>
+  </g>
+</svg>
