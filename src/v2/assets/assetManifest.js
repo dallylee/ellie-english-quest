@@ -1,5 +1,6 @@
 export const v2AssetPaths = {
   backgrounds: {
+    cloudHarborSleepingDockMobile: "/assets/v2/backgrounds/cloud-harbor-sleeping-dock-mobile.webp",
     trophyShelfRoom: "/assets/v2/backgrounds/luma-trophy-shelf-room.webp",
     trophyShelfRoomMobile: "/assets/v2/backgrounds/luma-trophy-shelf-room-mobile.webp",
     skyHarborAurora: "/assets/v2/ui/sky-harbor-aurora.svg"
@@ -37,9 +38,15 @@ export function getRewardVisual(rewardName) {
 }
 
 export const v2AssetManifest = {
-  strategy: "procedural-first",
+  strategy: "hybrid-local-art-and-procedural-overlays",
   publicAssets: [],
   generatedAssets: [
+    {
+      path: v2AssetPaths.backgrounds.cloudHarborSleepingDockMobile,
+      purpose: "Mobile-first illustrated Cloud Harbor scenic background plate for The Sleeping Dock",
+      origin: "Original generated local project art",
+      license: "Original project asset for Eli's English Quest 2.0"
+    },
     {
       path: v2AssetPaths.backgrounds.trophyShelfRoom,
       purpose: "Magical reward room backdrop for Luma's trophy shelf",
@@ -82,7 +89,7 @@ export const v2AssetManifest = {
     "Sky Islands world map",
     "Animated sky bridges",
     "Expressive Luma orb",
-    "Cloud Harbor dock and task objects",
+    "Cloud Harbor animated overlay effects, task hotspots, listening cue and reward objects",
     "Breakfast Breeze picnic island and task objects",
     "School Star Observatory dome, telescope, clock, school props, constellations and task objects",
     "Rhythm Cloud Stage concert stage, microphone, rhythm pads, thunder puff, music notes and task objects",

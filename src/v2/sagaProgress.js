@@ -9,6 +9,42 @@ function unique(items) {
   return [...new Set((items || []).filter(Boolean))];
 }
 
+const CLOUD_HARBOR_TASK_ID_MIGRATION = {
+  "wake-lumas-harbour-memory": "wake-the-dock",
+  "light-the-sky-lantern": "light-the-lantern",
+  "raise-the-cloud-flag": "choose-blue-wind",
+  "find-the-silver-key": "find-silver-key",
+  "mix-the-breeze-potion": "mix-breeze-potion",
+  "ask-the-tiny-gate": "open-cloud-gate",
+  "cast-the-cloud-spell": "cast-cloud-path-spell",
+  "open-the-first-bridge": "build-first-bridge"
+};
+
+function migrateCloudHarborTaskProgress(saga) {
+  const skyTasks = saga.skyIslands?.completedTaskIdsByLevel || saga.completedTaskIdsByLevel?.["sky-islands"];
+  const taskIds = skyTasks?.["cloud-harbor"];
+  if (!Array.isArray(taskIds) || !taskIds.length) return;
+
+  let changed = false;
+  const migrated = taskIds.map((taskId) => {
+    const nextTaskId = CLOUD_HARBOR_TASK_ID_MIGRATION[taskId] || taskId;
+    if (nextTaskId !== taskId) changed = true;
+    return nextTaskId;
+  });
+
+  if (!changed) return;
+  skyTasks["cloud-harbor"] = unique(migrated);
+  saga.completedTaskIdsByLevel["sky-islands"] = skyTasks;
+  if (saga.skyIslands) {
+    saga.skyIslands.completedTaskIdsByLevel = skyTasks;
+    saga.skyIslands.taskProgress = skyTasks;
+  }
+  saga.migrations = {
+    ...(saga.migrations || {}),
+    cloudHarborBibleV1TaskIds: true
+  };
+}
+
 function ensureWorldMaps(saga) {
   saga.unlockedWorldIds = unique(saga.unlockedWorldIds || ["sky-islands"]);
   saga.unlockedLevelIdsByWorld = saga.unlockedLevelIdsByWorld || {};
@@ -47,11 +83,16 @@ function ensureWorldMaps(saga) {
   saga.skyIslands.completedLevelIds = unique(saga.skyIslands.completedLevelIds);
   saga.skyIslands.completedIslandIds = unique(saga.skyIslands.completedIslandIds || saga.skyIslands.completedLevelIds);
   saga.skyIslands.collectedRewards = unique(saga.skyIslands.collectedRewards);
-  saga.skyIslands.completedTaskIdsByLevel = saga.skyIslands.completedTaskIdsByLevel || saga.skyIslands.taskProgress || {};
+  saga.skyIslands.completedTaskIdsByLevel = {
+    ...(saga.completedTaskIdsByLevel["sky-islands"] || {}),
+    ...(saga.skyIslands.completedTaskIdsByLevel || saga.skyIslands.taskProgress || {})
+  };
   saga.skyIslands.taskProgress = saga.skyIslands.completedTaskIdsByLevel;
   if (saga.skyIslands.mapIntroSeen) {
     saga.mapIntroSeenByWorld["sky-islands"] = true;
   }
+
+  migrateCloudHarborTaskProgress(saga);
 
   saga.unlockedLevelIdsByWorld["sky-islands"] = saga.skyIslands.unlockedLevelIds;
   saga.completedLevelIdsByWorld["sky-islands"] = saga.skyIslands.completedLevelIds;

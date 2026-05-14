@@ -14,6 +14,7 @@ import {
   skyIslands
 } from "../src/v2/skyIslandsData.js";
 import { sagaWorlds, getLevelById, getWorldById } from "../src/v2/sagaWorldData.js";
+import { getCompletedTaskIds, normaliseSaga } from "../src/v2/sagaProgress.js";
 import { v2AssetManifest } from "../src/v2/assets/assetManifest.js";
 
 const errors = [];
@@ -219,11 +220,91 @@ const playableCloudHarbor = getLevelById("sky-islands", "cloud-harbor");
 if (!playableCloudHarbor || playableCloudHarbor.reward !== "Cloud Compass" || playableCloudHarbor.tasks?.length !== 8) {
   errors.push("Cloud Harbor must be the complete 8-task playable template with Cloud Compass reward");
 } else {
+  if (playableCloudHarbor.subtitle !== "The Sleeping Dock") {
+    errors.push("Cloud Harbor must use the Bible subtitle: The Sleeping Dock");
+  }
+  if (playableCloudHarbor.storyGoal !== "Wake Cloud Harbor and open the first bridge.") {
+    errors.push("Cloud Harbor must expose the story goal: Wake Cloud Harbor and open the first bridge.");
+  }
+  for (const introField of ["displayText", "spokenText", "followUpDisplayText", "followUpSpokenText"]) {
+    if (!playableCloudHarbor.storyIntro?.[introField]) {
+      errors.push(`Cloud Harbor storyIntro missing ${introField}`);
+    }
+  }
+  if (!playableCloudHarbor.storyIntro?.displayText?.includes("ELI") || playableCloudHarbor.storyIntro?.displayText?.includes("Ellie")) {
+    errors.push("Cloud Harbor intro display text must show ELI, not Ellie");
+  }
+  if (!playableCloudHarbor.storyIntro?.spokenText?.includes("Ellie") || playableCloudHarbor.storyIntro?.spokenText?.includes("ELI")) {
+    errors.push("Cloud Harbor intro spoken text must say Ellie, not ELI");
+  }
+  if (playableCloudHarbor.backgroundPlate !== "/assets/v2/backgrounds/cloud-harbor-sleeping-dock-mobile.webp") {
+    errors.push("Cloud Harbor must reference the local mobile-first background plate asset");
+  }
+  const expectedCloudHarborTaskIds = [
+    "wake-the-dock",
+    "light-the-lantern",
+    "choose-blue-wind",
+    "find-silver-key",
+    "mix-breeze-potion",
+    "open-cloud-gate",
+    "cast-cloud-path-spell",
+    "build-first-bridge"
+  ];
+  if (JSON.stringify(playableCloudHarbor.tasks.map((task) => task.id)) !== JSON.stringify(expectedCloudHarborTaskIds)) {
+    errors.push("Cloud Harbor task IDs must match the Bible story sequence");
+  }
+  const choiceOrMemoryTasks = playableCloudHarbor.tasks.filter((task) => ["choice", "memory"].includes(task.answerType));
+  if (choiceOrMemoryTasks.length < 2) {
+    errors.push("Cloud Harbor must include at least two choice or memory tasks");
+  }
+  if (!playableCloudHarbor.tasks.some((task) => task.memorySet?.bridgeWindColour === "blue")) {
+    errors.push("Cloud Harbor must store the blue bridge wind clue");
+  }
+  if (!playableCloudHarbor.tasks.some((task) => task.memoryRead === "bridgeWindColour")) {
+    errors.push("Cloud Harbor must read the blue bridge wind clue later");
+  }
   for (const [taskIndex, task] of playableCloudHarbor.tasks.entries()) {
-    for (const requiredField of ["screenObject", "lumaLine", "expectedAnswer", "targetWords", "successAnimation", "gentleHint"]) {
+    for (const requiredField of ["screenObject", "lumaLine", "spokenLine", "expectedAnswer", "targetWords", "successAnimation", "successLine", "gentleHint", "storyPurpose", "visualFocus", "answerType"]) {
       if (!task[requiredField] || (requiredField === "targetWords" && !Array.isArray(task.targetWords))) {
         errors.push(`Cloud Harbor task ${taskIndex + 1} missing playable field: ${requiredField}`);
       }
+    }
+    if (task.lumaLine.includes("Ellie") || task.expectedAnswer.includes("Ellie")) {
+      errors.push(`Cloud Harbor task ${taskIndex + 1} display fields must use ELI, not Ellie`);
+    }
+  }
+  const wakeTask = playableCloudHarbor.tasks.find((task) => task.id === "wake-the-dock");
+  if (!wakeTask?.targetWords?.includes("eli") || !wakeTask?.targetWords?.includes("ellie")) {
+    errors.push("Cloud Harbor wake task must accept both eli and ellie");
+  }
+  const oldCloudHarborTaskIds = [
+    "wake-lumas-harbour-memory",
+    "light-the-sky-lantern",
+    "raise-the-cloud-flag",
+    "find-the-silver-key",
+    "mix-the-breeze-potion",
+    "ask-the-tiny-gate",
+    "cast-the-cloud-spell",
+    "open-the-first-bridge"
+  ];
+  const migratedSaga = normaliseSaga({
+    ...progress.saga,
+    completedTaskIdsByLevel: {
+      ...progress.saga.completedTaskIdsByLevel,
+      "sky-islands": {
+        ...(progress.saga.completedTaskIdsByLevel?.["sky-islands"] || {}),
+        "cloud-harbor": oldCloudHarborTaskIds
+      }
+    }
+  });
+  const migratedCloudHarborIds = getCompletedTaskIds(migratedSaga, "sky-islands", "cloud-harbor");
+  if (JSON.stringify(migratedCloudHarborIds) !== JSON.stringify(expectedCloudHarborTaskIds)) {
+    errors.push("Old Cloud Harbor task IDs must migrate safely to the new Bible task IDs");
+  }
+  for (const unaffectedLevelId of ["breakfast-breeze", "school-star-observatory", "rhythm-cloud-stage", "london-wind-gate"]) {
+    const completed = getCompletedTaskIds(migratedSaga, "sky-islands", unaffectedLevelId);
+    if (completed.length) {
+      errors.push(`Cloud Harbor migration must not alter ${unaffectedLevelId} progress`);
     }
   }
 }
@@ -788,10 +869,20 @@ for (const requiredSnippet of ["QUIET_VOICE_MESSAGE", "activeListeningLock", "re
   }
 }
 
-for (const debugLabel of ["speech synthesis:", "voice mode:", "gemini status:", "worker:", "worker websocket:", "gemini key:", "gemini chunks:", "browser tts fallback:", "quiet fallback:", "last tts error:", "last stt error:", "prompt playback:", "active gemini sessions:", "received chunks:", "scheduled chunks:", "skipped duplicate chunks:", "stale chunks ignored:", "scheduled audio:", "audio queue depth:", "audio context rate:", "gemini sample rate:"]) {
+for (const debugLabel of ["speech synthesis:", "final voice mode:", "voice mode:", "gemini status:", "worker:", "worker websocket:", "gemini key:", "gemini chunks:", "browser tts fallback:", "fallback suppressed:", "quiet fallback:", "last tts error:", "last stt error:", "prompt playback:", "active gemini sessions:", "received chunks:", "scheduled chunks:", "skipped duplicate chunks:", "stale chunks ignored:", "scheduled audio:", "audio queue depth:", "audio context rate:", "gemini sample rate:"]) {
   if (!sagaAppSource.includes(debugLabel)) {
     errors.push(`debugVoice panel missing ${debugLabel}`);
   }
+}
+
+for (const requiredSnippet of ["geminiPlaybackStartedForPrompt", "browserTtsFallbackSuppressed", "suppressBrowserTtsForPrompt", "cancelBrowserTtsFallback"]) {
+  if (!voiceGuideSource.includes(requiredSnippet)) {
+    errors.push(`Voice guide missing Gemini success browser-TTS suppression marker: ${requiredSnippet}`);
+  }
+}
+
+if (!sagaAppSource.includes("luma-listening-ear") || !sagaAppSource.includes("data-turn-state")) {
+  errors.push("Luma companion must include a code-driven listening ear cue tied to turn state");
 }
 
 const workerSourcePath = path.join(rootDir, "workers", "gemini-voice-proxy.js");
@@ -833,8 +924,30 @@ if (!fs.existsSync(path.join(rootDir, "public", "assets", "v2", "ATTRIBUTIONS.md
   errors.push("V2 asset attribution file must exist");
 }
 
-if (!v2AssetManifest || v2AssetManifest.strategy !== "procedural-first") {
-  errors.push("V2 asset manifest must describe the procedural-first asset strategy");
+if (!v2AssetManifest || v2AssetManifest.strategy !== "hybrid-local-art-and-procedural-overlays") {
+  errors.push("V2 asset manifest must describe the hybrid local art plus procedural overlay strategy");
+}
+
+const cloudHarborBackgroundUrl = "/assets/v2/backgrounds/cloud-harbor-sleeping-dock-mobile.webp";
+const cloudHarborBackgroundPath = path.join(rootDir, "public", decodeURIComponent(cloudHarborBackgroundUrl.replace(/^\/+/, "")));
+if (!fs.existsSync(cloudHarborBackgroundPath)) {
+  errors.push("Missing Cloud Harbor generated background plate asset");
+}
+
+if (!v2AssetManifest.generatedAssets?.some((asset) => asset.path === cloudHarborBackgroundUrl && /Cloud Harbor/i.test(asset.purpose || ""))) {
+  errors.push("V2 asset manifest must register the Cloud Harbor generated background plate");
+}
+
+const attributionSource = fs.readFileSync(path.join(rootDir, "public", "assets", "v2", "ATTRIBUTIONS.md"), "utf8");
+if (!attributionSource.includes("cloud-harbor-sleeping-dock-mobile.webp") || !attributionSource.includes("Cloud Harbor art brief")) {
+  errors.push("V2 attributions must document the Cloud Harbor generated background and art brief");
+}
+
+const sagaWorldDataSource = fs.readFileSync(path.join(rootDir, "src", "v2", "sagaWorldData.js"), "utf8");
+for (const requiredSnippet of ["displayLearnerName", "spokenLearnerName", "ELI", "Ellie"]) {
+  if (!sagaWorldDataSource.includes(requiredSnippet)) {
+    errors.push(`Cloud Harbor ELI/Ellie handling missing ${requiredSnippet}`);
+  }
 }
 
 for (const assetUrl of v2AssetManifest.reusedLocalAssets || []) {

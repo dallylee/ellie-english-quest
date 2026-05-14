@@ -97,11 +97,25 @@ function LumaFace({ mood = "happy" }) {
   );
 }
 
-function LumaCompanion({ mood, caption, hidden = false }) {
+function LumaCompanion({ mood, caption, hidden = false, voiceActivity = "idle" }) {
   if (hidden) return null;
+  const turnState = voiceActivity === "listening"
+    ? "listening"
+    : voiceActivity === "orb-speaking"
+      ? "speaking"
+      : voiceActivity === "reward"
+        ? "success"
+        : voiceActivity === "heard-you"
+          ? "heard-you"
+          : voiceActivity === "unclear" || voiceActivity === "fallback"
+            ? "thinking"
+            : mood === "thinking"
+              ? "thinking"
+              : "idle";
   return (
-    <div className="luma-companion">
+    <div className="luma-companion" data-turn-state={turnState}>
       <LumaFace mood={mood} />
+      {turnState === "listening" ? <span className="luma-listening-ear" aria-hidden="true" /> : null}
       <div className="luma-caption">{caption}</div>
     </div>
   );
@@ -159,8 +173,10 @@ function VoiceDebugPanel({ activeTaskId, voiceActivity }) {
       <span>activity: {voiceActivity}</span>
       <span>speech synthesis: {diagnostics.speechSynthesisSupported ? "supported" : "unsupported"}</span>
       <span>tts: {diagnostics.lastTtsProvider || "none"} / {diagnostics.lastTtsSpoken ? "played" : diagnostics.lastTtsError || "pending"}</span>
+      <span>final voice mode: {diagnostics.finalVoiceMode || diagnostics.voiceMode || "none"}</span>
       <span>voice mode: {diagnostics.voiceMode || "none"}</span>
       <span>browser tts fallback: {diagnostics.browserTtsFallbackUsed ? "used" : "not used"}</span>
+      <span>fallback suppressed: {diagnostics.browserTtsFallbackSuppressed ? "yes" : "no"}</span>
       <span>quiet fallback: {diagnostics.quietFallbackUsed ? "shown" : "no"}</span>
       <span>last tts error: {diagnostics.lastTtsError || "none"}</span>
       <span>speech recognition: {diagnostics.speechRecognitionSupported ? "supported" : "unsupported"}</span>
@@ -389,7 +405,7 @@ function SkyWorldView({
         progressionAnimation={progressionAnimation}
         onSelectLevel={onSelectLevel}
       />
-      <LumaCompanion mood={lumaMood} caption={caption} hidden={view === "worldMapIntro" && introStage === "center"} />
+      <LumaCompanion mood={lumaMood} caption={caption} voiceActivity={voiceActivity} hidden={view === "worldMapIntro" && introStage === "center"} />
       {view === "worldMapIntro" ? (
         <div className="start-adventure-layer">
           <div className="start-adventure-prompt">
@@ -416,6 +432,9 @@ function SkyWorldView({
           </div>
           <TaskProgressGems total={activeLevel.tasks.length} completedCount={completedTaskIds.length} />
         </div>
+      ) : null}
+      {view === "levelIntro" && activeLevel?.storyGoal ? (
+        <div className="level-story-goal" role="status">{activeLevel.storyGoal}</div>
       ) : null}
       {children}
       <VoiceDebugPanel activeTaskId={activeTask?.id} voiceActivity={voiceActivity} />
@@ -587,11 +606,75 @@ function SagaApp({ initialProgress, debugMode = false, onProgressChange, onExit,
 
   useEffect(() => {
     if (view !== "levelIntro") return undefined;
-    const timer = window.setTimeout(() => {
+    let cancelled = false;
+
+    if (activeLevel.id !== CLOUD_HARBOR_ID || !activeLevel.storyIntro) {
+      const timer = window.setTimeout(() => {
+        setView("levelTask");
+      }, 650);
+      return () => window.clearTimeout(timer);
+    }
+
+    async function playLevelIntro() {
+      const introTask = {
+        id: `${activeLevel.id}-story-intro`,
+        title: `${activeLevel.title} intro`,
+        screenObject: "Cloud Harbor",
+        expectedAnswer: "I am ready.",
+        targetWords: ["ready"]
+      };
+      primeVoice("cloud-harbor-intro");
+      setLumaMood("happy");
+      setVoiceActivity("orb-speaking");
+      setCaption(activeLevel.storyIntro.displayText);
+      await mapVoiceGuide.startSession({
+        world: selectedWorld,
+        level: activeLevel,
+        task: introTask,
+        mood: "happy",
+        recentEvent: "level-story-intro"
+      });
+      const firstVoice = await mapVoiceGuide.playGuidePrompt(activeLevel.storyIntro.spokenText, { mood: "happy" });
+      if (cancelled) return;
+      if (!firstVoice.spoken) {
+        const compatibilityNote = getVoiceCompatibilityNote();
+        setCaption(compatibilityNote ? `${QUIET_VOICE_MESSAGE} ${compatibilityNote}` : QUIET_VOICE_MESSAGE);
+        await new Promise((resolve) => window.setTimeout(resolve, 850));
+        if (cancelled) return;
+      }
+
+      setLumaMood("thinking");
+      setVoiceActivity("orb-speaking");
+      setCaption(activeLevel.storyIntro.followUpDisplayText);
+      const followUpVoice = await mapVoiceGuide.playGuidePrompt(activeLevel.storyIntro.followUpSpokenText, { mood: "thinking" });
+      if (cancelled) return;
+      if (!followUpVoice.spoken) {
+        const compatibilityNote = getVoiceCompatibilityNote();
+        setCaption(compatibilityNote ? `${QUIET_VOICE_MESSAGE} ${compatibilityNote}` : QUIET_VOICE_MESSAGE);
+        await new Promise((resolve) => window.setTimeout(resolve, 850));
+        if (cancelled) return;
+      }
+
+      mapVoiceGuide.stopSession("cloud-harbor-intro-complete");
+      setCaption(activeLevel.storyGoal);
+      setVoiceActivity("thinking");
+      setLumaMood("thinking");
+      await new Promise((resolve) => window.setTimeout(resolve, 950));
+      if (cancelled) return;
+      const firstTask = getActiveTask(progress.saga, selectedWorldId, activeLevel.id);
+      setActiveTaskId(firstTask?.id || null);
+      setCaption(firstTask?.lumaLine || activeLevel.storyGoal);
+      setVoiceActivity("idle");
       setView("levelTask");
-    }, 650);
-    return () => window.clearTimeout(timer);
-  }, [view]);
+    }
+
+    playLevelIntro();
+
+    return () => {
+      cancelled = true;
+      mapVoiceGuide.stopSession("cloud-harbor-intro-cleanup");
+    };
+  }, [activeLevel, mapVoiceGuide, progress.saga, selectedWorld, selectedWorldId, view]);
 
   const handleVoiceCorrect = useCallback(async () => {
     const task = activeTask;
@@ -600,7 +683,7 @@ function SagaApp({ initialProgress, debugMode = false, onProgressChange, onExit,
     const result = completeTask(progress.saga, selectedWorldId, activeLevelId, task.id);
     await commitSaga(result.saga);
     setSuccessTaskId(task.id);
-    setCaption(task.successAnimation);
+    setCaption(result.levelComplete ? task.rewardDisplayLine || task.successLine || task.successAnimation : task.successLine || task.successAnimation);
     setLumaMood(result.levelComplete ? "proud" : "happy");
     setVoiceActivity("reward");
 

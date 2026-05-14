@@ -14,14 +14,12 @@ export function VoiceInterface({
   onGentleMiss
 }) {
   const [fallbackVisible, setFallbackVisible] = useState(false);
-  const [transientTranscript, setTransientTranscript] = useState("");
   const voiceGuide = useMemo(() => createVoiceGuide({ voiceEnabled }), [voiceEnabled]);
   const runIdRef = useRef(0);
 
   useEffect(() => {
     if (!active || !task) {
       setFallbackVisible(false);
-      setTransientTranscript("");
       return undefined;
     }
 
@@ -30,9 +28,10 @@ export function VoiceInterface({
     runIdRef.current = runId;
 
     async function speakAndListen() {
+      const displayPrompt = task.lumaLine;
+      const spokenPrompt = task.spokenLine || task.lumaLine;
       setFallbackVisible(false);
-      setTransientTranscript("");
-      onCaptionChange?.(task.lumaLine);
+      onCaptionChange?.(displayPrompt);
       onMoodChange?.(task.mood || "thinking");
       onVoiceActivityChange?.("orb-speaking");
 
@@ -43,7 +42,7 @@ export function VoiceInterface({
         mood: task.mood || "thinking",
         recentEvent: "task-start"
       });
-      const promptVoice = await voiceGuide.playGuidePrompt(task.lumaLine, { mood: task.mood || "thinking" });
+      const promptVoice = await voiceGuide.playGuidePrompt(spokenPrompt, { mood: task.mood || "thinking" });
       if (cancelled || runIdRef.current !== runId) return;
       if (!promptVoice.spoken) {
         const compatibilityNote = getVoiceCompatibilityNote();
@@ -53,13 +52,13 @@ export function VoiceInterface({
       }
 
       for (let attempt = 0; attempt < 2; attempt += 1) {
+        onCaptionChange?.(task.listeningLine || "Your turn, ELI.");
         onMoodChange?.("listening");
         onVoiceActivityChange?.("listening");
         const result = await voiceGuide.listenForAnswer({ timeoutMs: 9000, taskId: task.id });
         if (cancelled || runIdRef.current !== runId) return;
 
         const transcript = result.transcript || "";
-        setTransientTranscript(transcript);
 
         if (!transcript) {
           onGentleMiss?.(result);
@@ -81,7 +80,6 @@ export function VoiceInterface({
           voiceGuide.stopSession("task-success");
           onCorrect?.({
             provider: result.provider,
-            transientTranscript: transcript,
             matched: evaluation.matched
           });
           return;
@@ -89,11 +87,16 @@ export function VoiceInterface({
 
         onGentleMiss?.({ ...result, evaluation });
         if (attempt === 0) {
-          const hintLine = `Good try. ${task.gentleHint}`;
+          const heardPrefix = evaluation.matched?.length ? `I heard ${evaluation.matched[0]}.` : "Good try.";
+          const hintLine = `${heardPrefix} ${task.gentleHint}`;
+          const hintVoiceLine = task.gentleHintSpoken || hintLine.replace(/\bELI\b/g, "Ellie");
           onCaptionChange?.(hintLine);
-          onMoodChange?.("sad");
+          onMoodChange?.(evaluation.matched?.length ? "thinking" : "sad");
+          onVoiceActivityChange?.(evaluation.matched?.length ? "heard-you" : "unclear");
+          await new Promise((resolve) => window.setTimeout(resolve, 260));
+          if (cancelled || runIdRef.current !== runId) return;
           onVoiceActivityChange?.("orb-speaking");
-          const hintVoice = await voiceGuide.playGuidePrompt(hintLine, { mood: "sad" });
+          const hintVoice = await voiceGuide.playGuidePrompt(hintVoiceLine, { mood: evaluation.matched?.length ? "thinking" : "sad" });
           if (!hintVoice.spoken) {
             const compatibilityNote = getVoiceCompatibilityNote();
             onCaptionChange?.(compatibilityNote ? `${QUIET_VOICE_MESSAGE} ${compatibilityNote}` : QUIET_VOICE_MESSAGE);
@@ -137,7 +140,6 @@ export function VoiceInterface({
     if (!task) return;
     voiceGuide.stopSession("fallback-tap");
     setFallbackVisible(false);
-    setTransientTranscript("");
     onMoodChange?.("proud");
     onVoiceActivityChange?.("reward");
     onCorrect?.(voiceGuide.fallbackToTap({ expected: task.expectedAnswer }));

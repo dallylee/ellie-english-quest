@@ -16,6 +16,7 @@ const preferredVoiceNames = [
 
 let cachedVoice = null;
 let activeUtterance = null;
+let activeSpeechCancel = null;
 let speechPrimed = false;
 let lastSpeechError = null;
 
@@ -123,9 +124,23 @@ function speakChunkWithDone(text, options = {}, onDone) {
     window.clearTimeout(guard);
     window.clearTimeout(startRetry);
     if (activeUtterance === utterance) activeUtterance = null;
+    if (activeSpeechCancel === cancelCurrent) activeSpeechCancel = null;
     if (result.error) lastSpeechError = result.error;
     onDone?.({ spoken: started, ...result });
   }
+
+  const cancelCurrent = () => {
+    try {
+      synth.cancel();
+    } catch {
+      // Browser speech is optional.
+    }
+    finish({
+      spoken: started,
+      cancelled: true,
+      error: "speech-cancelled"
+    });
+  };
 
   const guard = window.setTimeout(() => {
     finish({
@@ -150,6 +165,7 @@ function speakChunkWithDone(text, options = {}, onDone) {
   });
 
   activeUtterance = utterance;
+  activeSpeechCancel = cancelCurrent;
   try {
     synth.cancel();
     synth.resume?.();
@@ -204,6 +220,10 @@ export async function speakAsync(text, options = {}) {
 }
 
 export function stopSpeaking() {
+  if (activeSpeechCancel) {
+    activeSpeechCancel();
+    return;
+  }
   activeUtterance = null;
   if (hasSpeechSynthesis()) window.speechSynthesis.cancel();
 }

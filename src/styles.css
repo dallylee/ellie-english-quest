@@ -1507,6 +1507,265 @@ button:disabled {
   box-shadow: 0 24px 70px rgba(43, 97, 137, 0.18), 0 0 0 4px rgba(255, 208, 90, 0.22);
 }
 
+.sky-canvas-shell.has-background-plate {
+  background: #8edfff;
+}
+
+.sky-canvas-shell.has-background-plate canvas {
+  position: relative;
+  z-index: 2;
+  background: transparent !important;
+  opacity: 0;
+}
+
+.level-background-plate {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 38%;
+  pointer-events: none;
+  user-select: none;
+}
+
+.cloud-harbor-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.cloud-harbor-hotspot,
+.cloud-harbor-listening-glow {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  width: 4.2rem;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+}
+
+.cloud-harbor-hotspot {
+  opacity: 0.18;
+  transition: opacity 180ms ease;
+}
+
+.cloud-harbor-hotspot.active,
+.cloud-harbor-hotspot.done {
+  opacity: 1;
+}
+
+.cloud-harbor-hotspot-glow {
+  position: absolute;
+  inset: 0.38rem;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 240, 168, 0.66), rgba(82, 230, 255, 0.22) 46%, transparent 68%);
+  filter: blur(0.08rem);
+  animation: harbor-glow-pulse 1.8s ease-in-out infinite;
+}
+
+.cloud-harbor-hotspot.done .cloud-harbor-hotspot-glow {
+  background: radial-gradient(circle, rgba(255, 244, 168, 0.78), rgba(255, 212, 92, 0.3) 48%, transparent 70%);
+}
+
+.cloud-harbor-sparkle {
+  position: absolute;
+  width: 0.36rem;
+  aspect-ratio: 1;
+  border-radius: 2px;
+  background: #fff8d8;
+  box-shadow: 0 0 12px rgba(255, 240, 168, 0.86);
+  transform: rotate(45deg);
+  animation: harbor-sparkle-float 1.7s ease-in-out infinite;
+}
+
+.cloud-harbor-sparkle.a {
+  left: 22%;
+  top: 24%;
+}
+
+.cloud-harbor-sparkle.b {
+  right: 22%;
+  top: 34%;
+  animation-delay: 0.4s;
+}
+
+.cloud-harbor-sparkle.c {
+  left: 46%;
+  bottom: 18%;
+  animation-delay: 0.8s;
+}
+
+.cloud-harbor-flag-wave,
+.cloud-harbor-key-reveal,
+.cloud-harbor-potion-shimmer,
+.cloud-harbor-gate-swirl,
+.cloud-harbor-bridge-trail {
+  position: absolute;
+  pointer-events: none;
+}
+
+.cloud-harbor-flag-wave {
+  left: 26%;
+  top: 44%;
+  width: 7rem;
+  height: 2rem;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, rgba(82, 230, 255, 0.62), transparent);
+  transform: rotate(-18deg);
+  animation: harbor-flag-wave 1.9s ease-in-out infinite;
+}
+
+.cloud-harbor-key-reveal {
+  left: 51%;
+  top: 61%;
+  width: 2.4rem;
+  aspect-ratio: 1;
+  border: 0.22rem solid rgba(229, 249, 255, 0.94);
+  border-radius: 50%;
+  box-shadow: 1rem 0.35rem 0 -0.22rem rgba(229, 249, 255, 0.94), 1.45rem 0.35rem 0 -0.24rem rgba(229, 249, 255, 0.94), 0 0 22px rgba(186, 246, 255, 0.9);
+  transform: rotate(-22deg);
+  animation: harbor-key-float 2.1s ease-in-out infinite;
+}
+
+.cloud-harbor-potion-shimmer {
+  left: 64%;
+  top: 72%;
+  width: 7rem;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(82, 230, 255, 0.38), rgba(138, 141, 255, 0.16), transparent 66%);
+  animation: harbor-potion-shimmer 1.4s ease-in-out infinite;
+}
+
+.cloud-harbor-gate-swirl {
+  left: 68%;
+  top: 41%;
+  width: 8rem;
+  aspect-ratio: 1;
+  border: 0.18rem solid rgba(186, 246, 255, 0.6);
+  border-inline-color: transparent;
+  border-radius: 50%;
+  animation: harbor-gate-spin 2.6s linear infinite;
+}
+
+.cloud-harbor-bridge-trail {
+  right: 4%;
+  bottom: 15%;
+  width: 36%;
+  height: 0.7rem;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, rgba(255, 240, 168, 0.78), rgba(82, 230, 255, 0.48));
+  filter: blur(0.03rem);
+  transform: rotate(-28deg);
+  animation: harbor-bridge-trail 1.6s ease-in-out infinite;
+}
+
+.cloud-harbor-bridge-trail[data-built="true"] {
+  height: 1rem;
+  background: linear-gradient(90deg, rgba(255, 240, 168, 0.12), rgba(255, 240, 168, 0.9), rgba(82, 230, 255, 0.68));
+}
+
+.cloud-harbor-drift-cloud {
+  position: absolute;
+  width: 9rem;
+  height: 3.4rem;
+  border-radius: 999px;
+  background: radial-gradient(circle at 30% 40%, rgba(255, 255, 255, 0.66), transparent 2rem), rgba(255, 255, 255, 0.18);
+  filter: blur(0.03rem);
+  animation: harbor-cloud-drift 9s ease-in-out infinite;
+}
+
+.cloud-harbor-drift-cloud.one {
+  left: 2%;
+  top: 21%;
+}
+
+.cloud-harbor-drift-cloud.two {
+  right: 1%;
+  top: 18%;
+  animation-delay: -3s;
+}
+
+.cloud-harbor-drift-cloud.three {
+  left: 10%;
+  bottom: 7%;
+  animation-delay: -5s;
+}
+
+.cloud-harbor-scene-gems {
+  position: absolute;
+  left: 50%;
+  bottom: 1rem;
+  display: grid;
+  grid-template-columns: repeat(8, 0.58rem);
+  gap: 0.24rem;
+  transform: translateX(-50%);
+}
+
+.cloud-harbor-scene-gems span {
+  width: 0.58rem;
+  aspect-ratio: 1;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.44);
+  transform: rotate(45deg);
+  box-shadow: inset 0 0 0 1px rgba(23, 48, 71, 0.12);
+}
+
+.cloud-harbor-scene-gems span.active {
+  background: #baf6ff;
+  box-shadow: 0 0 12px rgba(82, 230, 255, 0.8);
+}
+
+.cloud-harbor-scene-gems span.done {
+  background: #ffd45c;
+  box-shadow: 0 0 12px rgba(255, 212, 92, 0.82), inset 0 0 0 1px #fff8d8;
+}
+
+.cloud-harbor-listening-glow {
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 117, 200, 0.36), rgba(255, 208, 237, 0.14), transparent 70%);
+  animation: listening-object-pulse 1.4s ease-in-out infinite;
+}
+
+.cloud-harbor-reward-pop {
+  position: absolute;
+  left: 50%;
+  top: 43%;
+  display: grid;
+  place-items: center;
+  width: 9rem;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  color: #173047;
+  background:
+    radial-gradient(circle at 36% 24%, rgba(255, 255, 255, 0.96), transparent 1.4rem),
+    radial-gradient(circle, #ffd45c, #52e6ff 56%, rgba(82, 230, 255, 0.18) 70%);
+  box-shadow: 0 0 36px rgba(255, 240, 168, 0.72), 0 0 60px rgba(82, 230, 255, 0.38);
+  transform: translate(-50%, -50%);
+  animation: harbor-reward-pop 2.2s ease-in-out infinite;
+}
+
+.cloud-harbor-reward-pop::before {
+  content: "";
+  position: absolute;
+  inset: 1.8rem;
+  border: 0.22rem solid rgba(255, 255, 255, 0.92);
+  border-radius: 50%;
+}
+
+.cloud-harbor-reward-pop span {
+  position: relative;
+  max-width: 6.2rem;
+  font-size: 0.9rem;
+  font-weight: 1000;
+  line-height: 1.05;
+  text-align: center;
+}
+
 .island-label {
   min-width: 6.8rem;
   border: 0;
@@ -1982,6 +2241,123 @@ button:disabled {
   }
 }
 
+@keyframes luma-mouth-talk {
+  0%, 100% {
+    transform: translateX(-50%) scaleY(0.78);
+  }
+  50% {
+    transform: translateX(-50%) scaleY(1.25);
+  }
+}
+
+@keyframes luma-ear-listen {
+  0%, 100% {
+    transform: rotate(18deg) scale(0.94);
+  }
+  50% {
+    transform: rotate(18deg) scale(1.1);
+  }
+}
+
+@keyframes harbor-glow-pulse {
+  0%, 100% {
+    opacity: 0.62;
+    transform: scale(0.92);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+}
+
+@keyframes harbor-sparkle-float {
+  0%, 100% {
+    opacity: 0.35;
+    transform: translateY(0) rotate(45deg) scale(0.76);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(-0.36rem) rotate(45deg) scale(1);
+  }
+}
+
+@keyframes harbor-flag-wave {
+  0%, 100% {
+    opacity: 0.48;
+    transform: rotate(-18deg) translateX(-0.2rem);
+  }
+  50% {
+    opacity: 0.9;
+    transform: rotate(-14deg) translateX(0.35rem);
+  }
+}
+
+@keyframes harbor-key-float {
+  0%, 100% {
+    transform: rotate(-22deg) translateY(0);
+  }
+  50% {
+    transform: rotate(-12deg) translateY(-0.3rem);
+  }
+}
+
+@keyframes harbor-potion-shimmer {
+  0%, 100% {
+    opacity: 0.44;
+    transform: translate(-50%, -50%) scale(0.92);
+  }
+  50% {
+    opacity: 0.86;
+    transform: translate(-50%, -50%) scale(1.06);
+  }
+}
+
+@keyframes harbor-gate-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes harbor-bridge-trail {
+  0%, 100% {
+    opacity: 0.48;
+    filter: blur(0.03rem);
+  }
+  50% {
+    opacity: 0.96;
+    filter: blur(0);
+  }
+}
+
+@keyframes harbor-cloud-drift {
+  0%, 100% {
+    transform: translateX(-0.5rem);
+  }
+  50% {
+    transform: translateX(0.7rem) translateY(-0.18rem);
+  }
+}
+
+@keyframes harbor-reward-pop {
+  0%, 100% {
+    transform: translate(-50%, -50%) scale(0.96) rotate(-2deg);
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.04) rotate(2deg);
+  }
+}
+
+@keyframes listening-object-pulse {
+  0%, 100% {
+    opacity: 0.4;
+    transform: translate(-50%, -50%) scale(0.92);
+  }
+  50% {
+    opacity: 0.88;
+    transform: translate(-50%, -50%) scale(1.12);
+  }
+}
+
 @media (max-width: 860px) {
   .saga-game-grid,
   .sky-control-grid {
@@ -2236,6 +2612,66 @@ button:disabled {
   border-left: 2px solid rgba(255, 255, 255, 0.86);
   border-bottom: 2px solid rgba(255, 255, 255, 0.86);
   transform: rotate(45deg);
+}
+
+.luma-companion[data-turn-state="speaking"] .orb-mouth {
+  animation: luma-mouth-talk 0.34s ease-in-out infinite;
+}
+
+.luma-companion[data-turn-state="listening"] .luma-hud-orb {
+  transform: scale(var(--orb-scale, 1)) rotate(-8deg);
+}
+
+.luma-companion[data-turn-state="success"] .luma-hud-orb {
+  filter: saturate(1.12);
+}
+
+.luma-companion[data-turn-state="thinking"] .luma-hud-orb,
+.luma-companion[data-turn-state="heard-you"] .luma-hud-orb {
+  transform: scale(var(--orb-scale, 1)) rotate(4deg);
+}
+
+.luma-listening-ear {
+  position: absolute;
+  z-index: 2;
+  left: clamp(2.9rem, 10vw, 3.8rem);
+  top: 0.16rem;
+  width: 1.9rem;
+  aspect-ratio: 1;
+  border-radius: 58% 42% 58% 42%;
+  background: linear-gradient(180deg, #fff6d9, #ffd0ed);
+  box-shadow: 0 0 18px rgba(255, 117, 200, 0.52), inset 0 0 0 0.16rem rgba(255, 255, 255, 0.72);
+  transform: rotate(18deg);
+  animation: luma-ear-listen 1.25s ease-in-out infinite;
+}
+
+.luma-listening-ear::before {
+  content: "";
+  position: absolute;
+  inset: 0.42rem 0.5rem 0.44rem 0.48rem;
+  border: 0.18rem solid rgba(23, 48, 71, 0.58);
+  border-left-color: transparent;
+  border-bottom-color: transparent;
+  border-radius: 50%;
+  transform: rotate(16deg);
+}
+
+.level-story-goal {
+  position: absolute;
+  z-index: 9;
+  left: 50%;
+  bottom: max(5.2rem, calc(env(safe-area-inset-bottom) + 5.2rem));
+  width: min(24rem, calc(100vw - 2rem));
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 8px;
+  padding: 0.7rem 0.85rem;
+  color: #173047;
+  background: linear-gradient(180deg, rgba(255, 248, 216, 0.94), rgba(219, 255, 237, 0.9));
+  box-shadow: 0 14px 30px rgba(9, 40, 80, 0.16);
+  font-weight: 950;
+  text-align: center;
+  transform: translateX(-50%);
+  pointer-events: none;
 }
 
 .start-adventure-layer {
@@ -3072,6 +3508,37 @@ button:disabled {
 
   .voice-fallback-chip {
     bottom: max(4.8rem, calc(env(safe-area-inset-bottom) + 4.8rem));
+  }
+
+  .level-background-plate {
+    object-position: center top;
+  }
+
+  .cloud-harbor-hotspot,
+  .cloud-harbor-listening-glow {
+    width: 3.35rem;
+  }
+
+  .cloud-harbor-scene-gems {
+    bottom: 0.65rem;
+    grid-template-columns: repeat(8, 0.5rem);
+    gap: 0.18rem;
+  }
+
+  .cloud-harbor-scene-gems span {
+    width: 0.5rem;
+  }
+
+  .level-story-goal {
+    bottom: max(4.6rem, calc(env(safe-area-inset-bottom) + 4.6rem));
+    width: min(19rem, calc(100vw - 1rem));
+    padding: 0.58rem 0.66rem;
+    font-size: 0.82rem;
+  }
+
+  .luma-listening-ear {
+    left: 2.55rem;
+    width: 1.45rem;
   }
 
   .reward-room-v2 {

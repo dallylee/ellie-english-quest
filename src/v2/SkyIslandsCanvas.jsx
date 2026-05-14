@@ -456,6 +456,68 @@ function SkyMapScene({ world, activeLevel, unlockedLevelIds, completedLevelIds, 
   );
 }
 
+const cloudHarborOverlaySpots = {
+  "wake-the-dock": { x: 35, y: 57, kind: "dock" },
+  "light-the-lantern": { x: 15, y: 58, kind: "lantern" },
+  "choose-blue-wind": { x: 31, y: 47, kind: "flag" },
+  "find-silver-key": { x: 52, y: 64, kind: "key" },
+  "mix-breeze-potion": { x: 66, y: 73, kind: "potion" },
+  "open-cloud-gate": { x: 69, y: 41, kind: "gate" },
+  "cast-cloud-path-spell": { x: 48, y: 53, kind: "spell" },
+  "build-first-bridge": { x: 74, y: 80, kind: "bridge" }
+};
+
+function CloudHarborPlateOverlay({ level, activeTask, completedTaskIds, voiceActivity, rewardEvent }) {
+  const completed = new Set(completedTaskIds || []);
+  const activeTaskId = activeTask?.id;
+  const activeSpot = activeTaskId ? cloudHarborOverlaySpots[activeTaskId] : null;
+  const bridgeBuilt = completed.has("build-first-bridge") || Boolean(rewardEvent);
+
+  return (
+    <div className="cloud-harbor-overlay" aria-hidden="true">
+      <div className="cloud-harbor-drift-cloud one" />
+      <div className="cloud-harbor-drift-cloud two" />
+      <div className="cloud-harbor-drift-cloud three" />
+      {level.tasks.map((task) => {
+        const spot = cloudHarborOverlaySpots[task.id];
+        if (!spot) return null;
+        const active = task.id === activeTaskId;
+        const done = completed.has(task.id);
+        return (
+          <span
+            key={task.id}
+            className={`cloud-harbor-hotspot ${spot.kind} ${active ? "active" : ""} ${done ? "done" : ""}`}
+            style={{ "--x": `${spot.x}%`, "--y": `${spot.y}%` }}
+          >
+            <span className="cloud-harbor-hotspot-glow" />
+            <span className="cloud-harbor-sparkle a" />
+            <span className="cloud-harbor-sparkle b" />
+            <span className="cloud-harbor-sparkle c" />
+          </span>
+        );
+      })}
+      {completed.has("choose-blue-wind") ? <span className="cloud-harbor-flag-wave" /> : null}
+      {completed.has("find-silver-key") ? <span className="cloud-harbor-key-reveal" /> : null}
+      {completed.has("mix-breeze-potion") ? <span className="cloud-harbor-potion-shimmer" /> : null}
+      {completed.has("open-cloud-gate") ? <span className="cloud-harbor-gate-swirl" /> : null}
+      {(completed.has("cast-cloud-path-spell") || bridgeBuilt) ? <span className="cloud-harbor-bridge-trail" data-built={bridgeBuilt ? "true" : "false"} /> : null}
+      <div className="cloud-harbor-scene-gems">
+        {level.tasks.map((task) => (
+          <span key={task.id} className={completed.has(task.id) ? "done" : activeTaskId === task.id ? "active" : ""} />
+        ))}
+      </div>
+      {rewardEvent ? (
+        <div className="cloud-harbor-reward-pop">
+          <span>{rewardEvent.label || "Cloud Compass"}</span>
+        </div>
+      ) : null}
+      {voiceActivity === "listening" && activeSpot ? (
+        <span className="cloud-harbor-listening-glow" style={{ "--x": `${activeSpot.x}%`, "--y": `${activeSpot.y}%` }} />
+      ) : null}
+    </div>
+  );
+}
+
 function HighlightRing({ active, color = "#fff0a8" }) {
   const mesh = useRef(null);
   useFrame((state) => {
@@ -2443,6 +2505,15 @@ function MiniSunberryBasketModel({ complete, active, scale = 1 }) {
 
 function CloudHarborScene({ level, activeTask, completedTaskIds, voiceActivity, rewardEvent }) {
   const completed = new Set(completedTaskIds || []);
+  if (level.backgroundPlate) {
+    return (
+      <>
+        <FloatingClouds voiceActivity={voiceActivity} />
+        {rewardEvent ? <CloudCompassReward rewardEvent={rewardEvent} /> : null}
+      </>
+    );
+  }
+
   const objectPositions = {
     "luma-memory": [-1.75, 0.38, 0.7],
     lantern: [-1.05, 0.28, -0.25],
@@ -2801,10 +2872,19 @@ const levelSceneThemes = {
 
 function BaseScene({ mode, activeLevel, children }) {
   const theme = mode === "level" ? levelSceneThemes[activeLevel?.sceneType] || defaultSceneTheme : defaultSceneTheme;
+  const hasBackgroundPlate = mode === "level" && Boolean(activeLevel?.backgroundPlate);
   return (
-    <Canvas camera={{ position: [0, 4.2, 7.2], fov: 48 }} dpr={[1, 1.5]} shadows={{ type: THREE.PCFShadowMap }}>
+    <Canvas
+      camera={{ position: [0, 4.2, 7.2], fov: 48 }}
+      dpr={[1, 1.5]}
+      shadows={{ type: THREE.PCFShadowMap }}
+      gl={{ alpha: hasBackgroundPlate, premultipliedAlpha: !hasBackgroundPlate }}
+      onCreated={({ gl }) => {
+        if (hasBackgroundPlate) gl.setClearColor(0x000000, 0);
+      }}
+    >
       <CameraRig mode={mode} />
-      <color attach="background" args={[theme.background]} />
+      {hasBackgroundPlate ? null : <color attach="background" args={[theme.background]} />}
       <fog attach="fog" args={theme.fog} />
       <ambientLight intensity={theme.ambient} />
       <hemisphereLight args={theme.hemi} />
@@ -2835,12 +2915,14 @@ export function SkyIslandsCanvas({
   progressionAnimation = null,
   onSelectLevel
 }) {
+  const backgroundPlate = mode === "level" ? activeLevel?.backgroundPlate : null;
   return (
     <div
-      className={`sky-canvas-shell adventure-canvas mode-${mode}`}
+      className={`sky-canvas-shell adventure-canvas mode-${mode} ${backgroundPlate ? "has-background-plate" : ""}`}
       data-voice-activity={voiceActivity}
       data-scene-type={mode === "level" ? activeLevel?.sceneType : "map"}
     >
+      {backgroundPlate ? <img className="level-background-plate" src={backgroundPlate} alt="" aria-hidden="true" draggable="false" /> : null}
       <BaseScene mode={mode} activeLevel={activeLevel}>
         {mode === "level" ? (
           <LevelScene
@@ -2865,6 +2947,15 @@ export function SkyIslandsCanvas({
           />
         )}
       </BaseScene>
+      {mode === "level" && activeLevel?.id === "cloud-harbor" && backgroundPlate ? (
+        <CloudHarborPlateOverlay
+          level={activeLevel}
+          activeTask={activeTask}
+          completedTaskIds={completedTaskIds}
+          voiceActivity={voiceActivity}
+          rewardEvent={rewardEvent}
+        />
+      ) : null}
     </div>
   );
 }

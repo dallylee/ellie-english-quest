@@ -36,6 +36,7 @@ const voiceDebugState = {
   geminiKeyConfigured: null,
   lastGeminiError: null,
   voiceMode: "none",
+  finalVoiceMode: "none",
   promptPlaybackId: null,
   activeGeminiSessions: 0,
   lastGeminiAudioChunks: 0,
@@ -48,6 +49,8 @@ const voiceDebugState = {
   audioContextSampleRate: null,
   geminiSampleRate: null,
   browserTtsFallbackUsed: false,
+  browserTtsFallbackSuppressed: false,
+  geminiPlaybackStartedForPrompt: false,
   quietFallbackUsed: false,
   lastPrimeReason: null
 };
@@ -136,7 +139,8 @@ export function getVoiceCompatibilityNote() {
 }
 
 const TEACHER_PROMPT = [
-  "You are the patient English teacher and glowing orb guide for Eli.",
+  "You are Luma, the patient English teacher and glowing orb guide for ELI.",
+  "On screen the learner name is ELI; when speaking, pronounce it Ellie.",
   "Use warm A1 to early A2 English.",
   "Ask one short question at a time.",
   "Never shame mistakes; gently model the sentence and invite another try.",
@@ -217,8 +221,9 @@ function buildClientContent({ prompt, mood, world, level, task, recentEvent }) {
                 `Task: ${task?.title || "quest task"}.`,
                 `Screen object: ${task?.screenObject || "quest object"}.`,
                 `Recent event: ${recentEvent || "none"}.`,
+                "On screen the learner name is ELI. Speak the name as Ellie.",
                 `Deterministic Luma line to voice: ${prompt}`,
-                `Expected learner answer: ${task?.expectedAnswer || "I am ready."}`,
+                `Expected learner answer: ${task?.expectedSpokenAnswer || task?.expectedAnswer || "I am ready."}`,
                 `Target words: ${(task?.targetWords || []).join(", ")}.`,
                 "Do not invent new quest steps, rewards, target words, or story order.",
                 "You may paraphrase very gently only if needed for natural speech.",
@@ -630,7 +635,81 @@ export function createVoiceGuide({ voiceEnabled = true } = {}) {
   let skippedDuplicateChunkCount = 0;
   let staleChunkCount = 0;
   let socketSessionCounted = false;
+  let browserFallbackTimer = null;
+  let browserFallbackPromptId = null;
+  let browserFallbackResolve = null;
+  let browserTtsFallbackSuppressed = false;
+  let geminiPlaybackStartedForPrompt = false;
   const liveAudio = createLiveAudioPlayer();
+
+  function resetPromptFallbackLatch() {
+    browserTtsFallbackSuppressed = false;
+    geminiPlaybackStartedForPrompt = false;
+    updateVoiceDebug({
+      browserTtsFallbackSuppressed: false,
+      geminiPlaybackStartedForPrompt: false
+    });
+  }
+
+  function cancelBrowserTtsFallback(promptPlaybackId = null, reason = "cancelled", { markSuppressed = true } = {}) {
+    if (promptPlaybackId && browserFallbackPromptId && browserFallbackPromptId !== promptPlaybackId) return false;
+    if (browserFallbackTimer) {
+      window.clearTimeout(browserFallbackTimer);
+      browserFallbackTimer = null;
+    }
+    if (markSuppressed) {
+      browserTtsFallbackSuppressed = true;
+      updateVoiceDebug({
+        browserTtsFallbackSuppressed: true,
+        browserTtsFallbackUsed: false,
+        quietFallbackUsed: false,
+        finalVoiceMode: "gemini-audio",
+        voiceMode: "gemini-audio",
+        lastTtsError: null
+      });
+    }
+    stopSpeaking();
+    browserFallbackResolve?.({
+      spoken: false,
+      suppressed: markSuppressed,
+      error: markSuppressed ? null : reason
+    });
+    browserFallbackResolve = null;
+    browserFallbackPromptId = null;
+    return true;
+  }
+
+  function suppressBrowserTtsForPrompt(promptPlaybackId) {
+    geminiPlaybackStartedForPrompt = true;
+    updateVoiceDebug({
+      geminiPlaybackStartedForPrompt: true,
+      quietFallbackUsed: false
+    });
+    return cancelBrowserTtsFallback(promptPlaybackId, "gemini-audio-started", { markSuppressed: true });
+  }
+
+  function playBrowserTtsFallback(prompt, options, promptPlaybackId) {
+    return new Promise((resolve) => {
+      browserFallbackPromptId = promptPlaybackId;
+      browserFallbackResolve = resolve;
+      browserFallbackTimer = window.setTimeout(async () => {
+        browserFallbackTimer = null;
+        if (geminiPlaybackStartedForPrompt || browserTtsFallbackSuppressed) {
+          resolve({ spoken: false, suppressed: true });
+          browserFallbackResolve = null;
+          browserFallbackPromptId = null;
+          return;
+        }
+        const result = await speakAsync(prompt, options);
+        const suppressed = browserTtsFallbackSuppressed || geminiPlaybackStartedForPrompt || result.cancelled;
+        resolve({ ...result, suppressed });
+        if (browserFallbackPromptId === promptPlaybackId) {
+          browserFallbackResolve = null;
+          browserFallbackPromptId = null;
+        }
+      }, 0);
+    });
+  }
 
   function cleanupSocket() {
     window.clearTimeout(setupTimer);
@@ -723,6 +802,7 @@ export function createVoiceGuide({ voiceEnabled = true } = {}) {
       for (const chunk of audioChunks) {
         const result = liveAudio.enqueuePcm(chunk.data, chunk.mimeType, promptPlaybackId);
         if (result.scheduled) {
+          if (audioChunkCount === 0) suppressBrowserTtsForPrompt(promptPlaybackId);
           audioChunkCount += 1;
         } else if (result.stale) {
           staleChunkCount += 1;
@@ -914,6 +994,7 @@ export function createVoiceGuide({ voiceEnabled = true } = {}) {
       sessionToken += 1;
       geminiConnectPromise = null;
       stopActiveRecognition(reason);
+      cancelBrowserTtsFallback(null, reason, { markSuppressed: false });
       cleanupSocket();
       liveAudio.stop();
       activePromptPlaybackId = null;
@@ -922,16 +1003,18 @@ export function createVoiceGuide({ voiceEnabled = true } = {}) {
       stopSpeaking();
       updateVoiceDebug({
         promptPlaybackId: null,
-        voiceMode: voiceDebugState.voiceMode === "gemini-audio" ? voiceDebugState.voiceMode : "none"
+        voiceMode: voiceDebugState.voiceMode === "gemini-audio" ? voiceDebugState.voiceMode : "none",
+        finalVoiceMode: voiceDebugState.finalVoiceMode === "gemini-audio" ? voiceDebugState.finalVoiceMode : "none"
       });
     },
 
     async playGuidePrompt(prompt, { mood = "happy" } = {}) {
       if (!voiceEnabled) {
-        updateVoiceDebug({ voiceMode: "none" });
+        updateVoiceDebug({ voiceMode: "none", finalVoiceMode: "none" });
         return { provider: "silent", spoken: false };
       }
 
+      resetPromptFallbackLatch();
       await waitForGeminiReady();
 
       if (session?.provider === "gemini-live" && socket?.readyState === WebSocket.OPEN) {
@@ -954,7 +1037,12 @@ export function createVoiceGuide({ voiceEnabled = true } = {}) {
             staleChunksIgnored: 0,
             scheduledAudioSeconds: 0,
             audioQueueDepth: 0,
-            voiceMode: "none"
+            voiceMode: "none",
+            finalVoiceMode: "pending",
+            browserTtsFallbackUsed: false,
+            browserTtsFallbackSuppressed: false,
+            quietFallbackUsed: false,
+            geminiPlaybackStartedForPrompt: false
           });
           const turnPromise = waitForTurn(promptPlaybackId);
           socket.send(JSON.stringify(buildClientContent({
@@ -967,6 +1055,7 @@ export function createVoiceGuide({ voiceEnabled = true } = {}) {
           })));
           const liveResult = await turnPromise;
           if (liveResult.spoken) {
+            suppressBrowserTtsForPrompt(promptPlaybackId);
             updateVoiceDebug({
               lastTtsProvider: "gemini-live",
               lastTtsSpoken: true,
@@ -974,12 +1063,15 @@ export function createVoiceGuide({ voiceEnabled = true } = {}) {
               lastGeminiError: null,
               geminiStatus: "connected",
               voiceMode: "gemini-audio",
+              finalVoiceMode: "gemini-audio",
               lastGeminiAudioChunks: liveResult.audioChunkCount || audioChunkCount,
               receivedGeminiChunks: liveResult.receivedChunkCount || receivedChunkCount,
               scheduledGeminiChunks: liveResult.audioChunkCount || audioChunkCount,
               skippedDuplicateChunks: liveResult.skippedDuplicateChunkCount ?? skippedDuplicateChunkCount,
               staleChunksIgnored: liveResult.staleChunkCount ?? staleChunkCount,
               browserTtsFallbackUsed: false,
+              browserTtsFallbackSuppressed: true,
+              geminiPlaybackStartedForPrompt: true,
               quietFallbackUsed: false
             });
             turnPromptPlaybackId = null;
@@ -991,10 +1083,12 @@ export function createVoiceGuide({ voiceEnabled = true } = {}) {
           cleanupSocket();
           const safeError = sanitizeDiagnosticError(error?.message || "Gemini Live playback failed");
           if (audioChunkCount > 0) {
+            suppressBrowserTtsForPrompt(failedPromptPlaybackId);
             await liveAudio.waitForPrompt(failedPromptPlaybackId).catch(() => {});
             updateVoiceDebug({
               geminiStatus: "connected",
               voiceMode: "gemini-audio",
+              finalVoiceMode: "gemini-audio",
               lastTtsProvider: "gemini-live",
               lastTtsSpoken: true,
               lastTtsError: safeError,
@@ -1005,6 +1099,8 @@ export function createVoiceGuide({ voiceEnabled = true } = {}) {
               skippedDuplicateChunks: skippedDuplicateChunkCount,
               staleChunksIgnored: staleChunkCount,
               browserTtsFallbackUsed: false,
+              browserTtsFallbackSuppressed: true,
+              geminiPlaybackStartedForPrompt: true,
               quietFallbackUsed: false
             });
             turnPromptPlaybackId = null;
@@ -1027,18 +1123,41 @@ export function createVoiceGuide({ voiceEnabled = true } = {}) {
             lastTtsSpoken: false,
             lastTtsError: safeError,
             lastGeminiError: safeError,
-            voiceMode: "failed"
+            voiceMode: "failed",
+            finalVoiceMode: "failed",
+            browserTtsFallbackSuppressed: false,
+            geminiPlaybackStartedForPrompt: false
           });
         }
       }
 
-      const result = await speakAsync(prompt, voiceOptionsForMood(mood));
+      const fallbackPromptPlaybackId = activePromptPlaybackId || `browser-${Date.now()}-${promptPlaybackSequence + 1}`;
+      if (!activePromptPlaybackId) {
+        activePromptPlaybackId = fallbackPromptPlaybackId;
+        promptPlaybackSequence += 1;
+      }
+      const result = await playBrowserTtsFallback(prompt, voiceOptionsForMood(mood), fallbackPromptPlaybackId);
+      if (result.suppressed) {
+        updateVoiceDebug({
+          lastTtsProvider: "gemini-live",
+          lastTtsSpoken: true,
+          lastTtsError: null,
+          voiceMode: "gemini-audio",
+          finalVoiceMode: "gemini-audio",
+          browserTtsFallbackUsed: false,
+          browserTtsFallbackSuppressed: true,
+          quietFallbackUsed: false
+        });
+        return { provider: "gemini-live", spoken: true, fallbackSuppressed: true };
+      }
       updateVoiceDebug({
         lastTtsProvider: "browser-tts",
         lastTtsSpoken: Boolean(result.spoken),
         lastTtsError: result.error || null,
         voiceMode: result.spoken ? "browser-tts" : "quiet-caption",
+        finalVoiceMode: result.spoken ? "browser-tts" : "quiet-caption",
         browserTtsFallbackUsed: true,
+        browserTtsFallbackSuppressed: false,
         quietFallbackUsed: !result.spoken
       });
       return { provider: "browser-tts", spoken: result.spoken, error: result.error || null };
