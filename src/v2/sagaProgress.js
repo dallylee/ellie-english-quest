@@ -16,9 +16,21 @@ const CLOUD_HARBOR_TASK_ID_MIGRATION = {
   "find-the-silver-key": "find-silver-key",
   "mix-the-breeze-potion": "mix-breeze-potion",
   "ask-the-tiny-gate": "open-cloud-gate",
-  "cast-the-cloud-spell": "cast-cloud-path-spell",
+  "cast-the-cloud-spell": "open-cloud-gate",
+  "cast-cloud-path-spell": "open-cloud-gate",
   "open-the-first-bridge": "build-first-bridge"
 };
+
+const CLOUD_HARBOR_DIRECTOR_TASK_IDS = [
+  "wake-the-dock",
+  "light-the-lantern",
+  "choose-blue-wind",
+  "read-flag-clue",
+  "find-silver-key",
+  "mix-breeze-potion",
+  "open-cloud-gate",
+  "build-first-bridge"
+];
 
 function migrateCloudHarborTaskProgress(saga) {
   const skyTasks = saga.skyIslands?.completedTaskIdsByLevel || saga.completedTaskIdsByLevel?.["sky-islands"];
@@ -31,9 +43,17 @@ function migrateCloudHarborTaskProgress(saga) {
     if (nextTaskId !== taskId) changed = true;
     return nextTaskId;
   });
+  const completedSet = new Set(migrated);
 
+  if (completedSet.has("find-silver-key") && !completedSet.has("read-flag-clue")) {
+    completedSet.add("read-flag-clue");
+    changed = true;
+  }
+
+  const canonicalCompleted = CLOUD_HARBOR_DIRECTOR_TASK_IDS.filter((taskId) => completedSet.has(taskId));
+  if (JSON.stringify(canonicalCompleted) !== JSON.stringify(taskIds)) changed = true;
   if (!changed) return;
-  skyTasks["cloud-harbor"] = unique(migrated);
+  skyTasks["cloud-harbor"] = unique(canonicalCompleted);
   saga.completedTaskIdsByLevel["sky-islands"] = skyTasks;
   if (saga.skyIslands) {
     saga.skyIslands.completedTaskIdsByLevel = skyTasks;
@@ -41,7 +61,8 @@ function migrateCloudHarborTaskProgress(saga) {
   }
   saga.migrations = {
     ...(saga.migrations || {}),
-    cloudHarborBibleV1TaskIds: true
+    cloudHarborBibleV1TaskIds: true,
+    cloudHarborDirectorTaskIds: true
   };
 }
 

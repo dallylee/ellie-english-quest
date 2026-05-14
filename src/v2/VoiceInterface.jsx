@@ -28,8 +28,8 @@ export function VoiceInterface({
     runIdRef.current = runId;
 
     async function speakAndListen() {
-      const displayPrompt = task.lumaLine;
-      const spokenPrompt = task.spokenLine || task.lumaLine;
+      const displayPrompt = task.displayPrompt || task.lumaLine;
+      const spokenPrompt = task.spokenPrompt || task.spokenLine || task.lumaLine;
       setFallbackVisible(false);
       onCaptionChange?.(displayPrompt);
       onMoodChange?.(task.mood || "thinking");
@@ -70,11 +70,17 @@ export function VoiceInterface({
 
         const evaluation = voiceGuide.evaluateAnswer({
           transcript,
-          targetWords: task.targetWords
+          targetWords: task.targetWords,
+          acceptedMeanings: task.acceptedMeanings,
+          redirectMeanings: task.redirectMeanings
         });
 
         if (evaluation.correct) {
           setFallbackVisible(false);
+          onMoodChange?.("thinking");
+          onVoiceActivityChange?.("heard-you");
+          await new Promise((resolve) => window.setTimeout(resolve, 180));
+          if (cancelled || runIdRef.current !== runId) return;
           onMoodChange?.("proud");
           onVoiceActivityChange?.("reward");
           voiceGuide.stopSession("task-success");
@@ -87,16 +93,21 @@ export function VoiceInterface({
 
         onGentleMiss?.({ ...result, evaluation });
         if (attempt === 0) {
-          const heardPrefix = evaluation.matched?.length ? `I heard ${evaluation.matched[0]}.` : "Good try.";
-          const hintLine = `${heardPrefix} ${task.gentleHint}`;
-          const hintVoiceLine = task.gentleHintSpoken || hintLine.replace(/\bELI\b/g, "Ellie");
+          const redirect = evaluation.redirect;
+          const baseHint = redirect?.displayLine || task.gentleClarifications?.[attempt] || task.gentleHint || "I heard you trying. Let's look at the clue.";
+          const heardPrefix = evaluation.matched?.length && !redirect ? `I heard ${evaluation.matched[0]}.` : "";
+          const hintLine = heardPrefix ? `${heardPrefix} ${baseHint}` : baseHint;
+          const hintVoiceLine = redirect?.spokenLine
+            || task.gentleClarificationsSpoken?.[attempt]
+            || task.gentleHintSpoken
+            || hintLine.replace(/\bELI\b/g, "Ellie");
           onCaptionChange?.(hintLine);
-          onMoodChange?.(evaluation.matched?.length ? "thinking" : "sad");
-          onVoiceActivityChange?.(evaluation.matched?.length ? "heard-you" : "unclear");
+          onMoodChange?.("thinking");
+          onVoiceActivityChange?.(redirect || evaluation.matched?.length ? "heard-you" : "unclear");
           await new Promise((resolve) => window.setTimeout(resolve, 260));
           if (cancelled || runIdRef.current !== runId) return;
           onVoiceActivityChange?.("orb-speaking");
-          const hintVoice = await voiceGuide.playGuidePrompt(hintVoiceLine, { mood: evaluation.matched?.length ? "thinking" : "sad" });
+          const hintVoice = await voiceGuide.playGuidePrompt(hintVoiceLine, { mood: "thinking" });
           if (!hintVoice.spoken) {
             const compatibilityNote = getVoiceCompatibilityNote();
             onCaptionChange?.(compatibilityNote ? `${QUIET_VOICE_MESSAGE} ${compatibilityNote}` : QUIET_VOICE_MESSAGE);

@@ -350,10 +350,58 @@ function listenWithBrowserSpeech({ timeoutMs = 9000, taskId = null } = {}) {
   });
 }
 
-export function evaluateSpokenAnswer(transcript, targetWords = []) {
+function meaningWords(meaning) {
+  const source = Array.isArray(meaning?.words)
+    ? meaning.words.join(" ")
+    : meaning?.meaning || meaning?.phrase || meaning;
+  return normaliseSpeech(source).split(" ").filter(Boolean);
+}
+
+function findMeaningMatch(heardWords, meanings = []) {
+  for (const meaning of meanings || []) {
+    const words = meaningWords(meaning);
+    if (!words.length) continue;
+    if (words.every((word) => heardWords.includes(word))) {
+      return {
+        meaning,
+        words
+      };
+    }
+  }
+  return null;
+}
+
+export function evaluateSpokenAnswer(transcript, targetWords = [], acceptedMeanings = [], redirectMeanings = []) {
   const heard = normaliseSpeech(transcript);
+  const heardWords = heard.split(" ").filter(Boolean);
+  const acceptedMatch = findMeaningMatch(heardWords, acceptedMeanings);
+  if (acceptedMatch) {
+    return {
+      correct: true,
+      matched: acceptedMatch.words,
+      heard,
+      needed: acceptedMatch.words.length,
+      acceptedMeaning: acceptedMatch.meaning
+    };
+  }
+
+  const redirectMatch = findMeaningMatch(heardWords, redirectMeanings);
+  if (redirectMatch) {
+    return {
+      correct: false,
+      matched: redirectMatch.words,
+      heard,
+      needed: redirectMatch.words.length,
+      redirect: redirectMatch.meaning
+    };
+  }
+
   const required = targetWords.map(normaliseSpeech).filter(Boolean);
-  const matched = required.filter((word) => heard.includes(word));
+  const matched = required.filter((word) => {
+    const words = word.split(" ").filter(Boolean);
+    if (words.length > 1) return words.every((item) => heardWords.includes(item));
+    return heardWords.includes(word);
+  });
   const needed = Math.max(1, Math.ceil(required.length * 0.55));
   return {
     correct: matched.length >= needed,
@@ -1167,8 +1215,8 @@ export function createVoiceGuide({ voiceEnabled = true } = {}) {
       return listenWithBrowserSpeech(options);
     },
 
-    evaluateAnswer({ transcript, targetWords }) {
-      return evaluateSpokenAnswer(transcript, targetWords);
+    evaluateAnswer({ transcript, targetWords, acceptedMeanings, redirectMeanings }) {
+      return evaluateSpokenAnswer(transcript, targetWords, acceptedMeanings, redirectMeanings);
     },
 
     fallbackToTap({ expected }) {

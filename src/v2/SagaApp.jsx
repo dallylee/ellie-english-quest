@@ -359,6 +359,7 @@ function SkyWorldView({
   onBack,
   onRewards,
   onExit,
+  onSupportInteraction,
   children
 }) {
   const introComplete = view !== "worldMapIntro";
@@ -404,6 +405,7 @@ function SkyWorldView({
         rewardEvent={rewardEvent}
         progressionAnimation={progressionAnimation}
         onSelectLevel={onSelectLevel}
+        onSupportInteraction={onSupportInteraction}
       />
       <LumaCompanion mood={lumaMood} caption={caption} voiceActivity={voiceActivity} hidden={view === "worldMapIntro" && introStage === "center"} />
       {view === "worldMapIntro" ? (
@@ -663,7 +665,7 @@ function SagaApp({ initialProgress, debugMode = false, onProgressChange, onExit,
       if (cancelled) return;
       const firstTask = getActiveTask(progress.saga, selectedWorldId, activeLevel.id);
       setActiveTaskId(firstTask?.id || null);
-      setCaption(firstTask?.lumaLine || activeLevel.storyGoal);
+      setCaption(firstTask?.displayPrompt || firstTask?.lumaLine || activeLevel.storyGoal);
       setVoiceActivity("idle");
       setView("levelTask");
     }
@@ -679,6 +681,7 @@ function SagaApp({ initialProgress, debugMode = false, onProgressChange, onExit,
   const handleVoiceCorrect = useCallback(async () => {
     const task = activeTask;
     if (!task) return;
+    if (getCompletedTaskIds(progress.saga, selectedWorldId, activeLevelId).includes(task.id)) return;
     playEffect?.("correct");
     const result = completeTask(progress.saga, selectedWorldId, activeLevelId, task.id);
     await commitSaga(result.saga);
@@ -699,12 +702,17 @@ function SagaApp({ initialProgress, debugMode = false, onProgressChange, onExit,
       const nextTask = getActiveTask(result.saga, selectedWorldId, activeLevelId);
       window.setTimeout(() => {
         setActiveTaskId(nextTask?.id || null);
-        setCaption(nextTask?.lumaLine || "The harbour is ready.");
+        setCaption(nextTask?.displayPrompt || nextTask?.lumaLine || "The harbour is ready.");
         setVoiceActivity("idle");
         setView("levelTask");
       }, 1050);
     }
   }, [activeLevelId, activeTask, commitSaga, playEffect, progress.saga, selectedWorldId]);
+
+  const handleSupportInteraction = useCallback(() => {
+    if (view !== "levelTask" || !activeTask?.supportTap) return;
+    handleVoiceCorrect();
+  }, [activeTask, handleVoiceCorrect, view]);
 
   const handleGentleMiss = useCallback(() => {
     playEffect?.("wrong");
@@ -810,6 +818,7 @@ function SagaApp({ initialProgress, debugMode = false, onProgressChange, onExit,
         onBack={() => setView("sagaHome")}
         onRewards={() => setView("rewardRoom")}
         onExit={onExit}
+        onSupportInteraction={handleSupportInteraction}
       >
         <VoiceInterface
           active={view === "levelTask" && Boolean(activeTask)}

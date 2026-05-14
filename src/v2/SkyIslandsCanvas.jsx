@@ -459,25 +459,37 @@ function SkyMapScene({ world, activeLevel, unlockedLevelIds, completedLevelIds, 
 const cloudHarborOverlaySpots = {
   "wake-the-dock": { x: 35, y: 57, kind: "dock" },
   "light-the-lantern": { x: 15, y: 58, kind: "lantern" },
-  "choose-blue-wind": { x: 31, y: 47, kind: "flag" },
-  "find-silver-key": { x: 52, y: 64, kind: "key" },
+  "choose-blue-wind": { x: 31, y: 47, kind: "wind" },
+  "read-flag-clue": { x: 49, y: 60, kind: "clouds" },
+  "find-silver-key": { x: 52, y: 61, kind: "key" },
   "mix-breeze-potion": { x: 66, y: 73, kind: "potion" },
   "open-cloud-gate": { x: 69, y: 41, kind: "gate" },
-  "cast-cloud-path-spell": { x: 48, y: 53, kind: "spell" },
   "build-first-bridge": { x: 74, y: 80, kind: "bridge" }
 };
 
-function CloudHarborPlateOverlay({ level, activeTask, completedTaskIds, voiceActivity, rewardEvent }) {
+function CloudHarborPlateOverlay({ level, activeTask, completedTaskIds, voiceActivity, rewardEvent, onSupportInteraction }) {
   const completed = new Set(completedTaskIds || []);
   const activeTaskId = activeTask?.id;
   const activeSpot = activeTaskId ? cloudHarborOverlaySpots[activeTaskId] : null;
   const bridgeBuilt = completed.has("build-first-bridge") || Boolean(rewardEvent);
+  const wakeDone = completed.has("wake-the-dock");
+  const lanternLit = completed.has("light-the-lantern");
+  const blueWindChosen = completed.has("choose-blue-wind");
+  const flagClueRead = completed.has("read-flag-clue");
+  const keyFound = completed.has("find-silver-key");
+  const potionMixed = completed.has("mix-breeze-potion");
+  const gateOpen = completed.has("open-cloud-gate");
+  const showWindChoices = activeTaskId === "choose-blue-wind" || blueWindChosen;
+  const showCloudPuffs = activeTaskId === "read-flag-clue" || activeTaskId === "find-silver-key" || flagClueRead || keyFound;
+  const showDropChoices = activeTaskId === "mix-breeze-potion" || potionMixed;
+  const showBridgeTrail = activeTaskId === "build-first-bridge" || gateOpen || bridgeBuilt;
 
   return (
-    <div className="cloud-harbor-overlay" aria-hidden="true">
+    <div className="cloud-harbor-overlay" aria-hidden={activeTask?.supportTap ? undefined : "true"}>
       <div className="cloud-harbor-drift-cloud one" />
       <div className="cloud-harbor-drift-cloud two" />
       <div className="cloud-harbor-drift-cloud three" />
+      {wakeDone ? <span className="cloud-harbor-harbor-shimmer" /> : null}
       {level.tasks.map((task) => {
         const spot = cloudHarborOverlaySpots[task.id];
         if (!spot) return null;
@@ -496,11 +508,42 @@ function CloudHarborPlateOverlay({ level, activeTask, completedTaskIds, voiceAct
           </span>
         );
       })}
-      {completed.has("choose-blue-wind") ? <span className="cloud-harbor-flag-wave" /> : null}
-      {completed.has("find-silver-key") ? <span className="cloud-harbor-key-reveal" /> : null}
-      {completed.has("mix-breeze-potion") ? <span className="cloud-harbor-potion-shimmer" /> : null}
-      {completed.has("open-cloud-gate") ? <span className="cloud-harbor-gate-swirl" /> : null}
-      {(completed.has("cast-cloud-path-spell") || bridgeBuilt) ? <span className="cloud-harbor-bridge-trail" data-built={bridgeBuilt ? "true" : "false"} /> : null}
+      {lanternLit ? <span className="cloud-harbor-blue-symbol" /> : null}
+      {showWindChoices ? (
+        <div className="cloud-harbor-wind-choices" data-complete={blueWindChosen ? "true" : "false"}>
+          <span className="cloud-harbor-wind-choice blue" />
+          <span className="cloud-harbor-wind-choice red" />
+          <span className="cloud-harbor-wind-choice yellow" />
+        </div>
+      ) : null}
+      {blueWindChosen ? <span className="cloud-harbor-flag-wave" /> : null}
+      {showCloudPuffs ? (
+        <div className="cloud-harbor-cloud-puffs" data-wiggle={flagClueRead || activeTaskId === "find-silver-key" ? "true" : "false"}>
+          <span className="cloud-harbor-cloud-puff-choice left" />
+          <span className={`cloud-harbor-cloud-puff-choice middle ${flagClueRead || keyFound ? "silver" : ""}`} />
+          <span className="cloud-harbor-cloud-puff-choice right" />
+        </div>
+      ) : null}
+      {keyFound ? <span className="cloud-harbor-key-reveal" /> : null}
+      {showDropChoices ? (
+        <div className="cloud-harbor-drop-choices" data-complete={potionMixed ? "true" : "false"}>
+          <span className="cloud-harbor-drop-choice blue" />
+          <span className="cloud-harbor-drop-choice red" />
+          <span className="cloud-harbor-drop-choice yellow" />
+        </div>
+      ) : null}
+      {potionMixed ? <span className="cloud-harbor-potion-shimmer" /> : null}
+      {gateOpen ? <span className="cloud-harbor-gate-swirl" /> : null}
+      {showBridgeTrail ? <span className="cloud-harbor-bridge-trail" data-built={bridgeBuilt ? "true" : "false"} /> : null}
+      {activeTask?.supportTap && activeSpot && onSupportInteraction ? (
+        <button
+          className="cloud-harbor-support-hotspot"
+          type="button"
+          aria-label="Choose the shiny cloud"
+          style={{ "--x": `${activeSpot.x}%`, "--y": `${activeSpot.y}%` }}
+          onClick={onSupportInteraction}
+        />
+      ) : null}
       <div className="cloud-harbor-scene-gems">
         {level.tasks.map((task) => (
           <span key={task.id} className={completed.has(task.id) ? "done" : activeTaskId === task.id ? "active" : ""} />
@@ -2518,6 +2561,7 @@ function CloudHarborScene({ level, activeTask, completedTaskIds, voiceActivity, 
     "luma-memory": [-1.75, 0.38, 0.7],
     lantern: [-1.05, 0.28, -0.25],
     flag: [-0.3, 0.25, -0.65],
+    "cloud-puffs": [0.42, 0.38, -0.02],
     "silver-key": [0.65, 0.35, 0.18],
     potion: [1.35, 0.2, -0.42],
     gate: [2.05, 0.18, 0.35],
@@ -2913,7 +2957,8 @@ export function SkyIslandsCanvas({
   voiceActivity = "idle",
   rewardEvent = null,
   progressionAnimation = null,
-  onSelectLevel
+  onSelectLevel,
+  onSupportInteraction
 }) {
   const backgroundPlate = mode === "level" ? activeLevel?.backgroundPlate : null;
   return (
@@ -2954,6 +2999,7 @@ export function SkyIslandsCanvas({
           completedTaskIds={completedTaskIds}
           voiceActivity={voiceActivity}
           rewardEvent={rewardEvent}
+          onSupportInteraction={onSupportInteraction}
         />
       ) : null}
     </div>

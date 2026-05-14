@@ -244,10 +244,10 @@ if (!playableCloudHarbor || playableCloudHarbor.reward !== "Cloud Compass" || pl
     "wake-the-dock",
     "light-the-lantern",
     "choose-blue-wind",
+    "read-flag-clue",
     "find-silver-key",
     "mix-breeze-potion",
     "open-cloud-gate",
-    "cast-cloud-path-spell",
     "build-first-bridge"
   ];
   if (JSON.stringify(playableCloudHarbor.tasks.map((task) => task.id)) !== JSON.stringify(expectedCloudHarborTaskIds)) {
@@ -264,14 +264,47 @@ if (!playableCloudHarbor || playableCloudHarbor.reward !== "Cloud Compass" || pl
     errors.push("Cloud Harbor must read the blue bridge wind clue later");
   }
   for (const [taskIndex, task] of playableCloudHarbor.tasks.entries()) {
-    for (const requiredField of ["screenObject", "lumaLine", "spokenLine", "expectedAnswer", "targetWords", "successAnimation", "successLine", "gentleHint", "storyPurpose", "visualFocus", "answerType"]) {
+    for (const requiredField of ["screenObject", "lumaLine", "spokenLine", "displayPrompt", "spokenPrompt", "expectedAnswer", "acceptedMeanings", "targetWords", "successAnimation", "successLine", "gentleHint", "gentleClarifications", "storyPurpose", "visibleProblem", "visualFocus", "answerType", "storyBeat", "activeObject"]) {
       if (!task[requiredField] || (requiredField === "targetWords" && !Array.isArray(task.targetWords))) {
         errors.push(`Cloud Harbor task ${taskIndex + 1} missing playable field: ${requiredField}`);
       }
     }
+    if (!Array.isArray(task.acceptedMeanings) || task.acceptedMeanings.length < 2) {
+      errors.push(`Cloud Harbor task ${taskIndex + 1} must use meaning-based acceptedMeanings`);
+    }
+    if (!Array.isArray(task.gentleClarifications) || !task.gentleClarifications.length) {
+      errors.push(`Cloud Harbor task ${taskIndex + 1} must include gentle clarification copy`);
+    }
     if (task.lumaLine.includes("Ellie") || task.expectedAnswer.includes("Ellie")) {
       errors.push(`Cloud Harbor task ${taskIndex + 1} display fields must use ELI, not Ellie`);
     }
+  }
+  const cloudHarborSayPromptCount = playableCloudHarbor.tasks.filter((task) => {
+    return /(^|\s)Say:/i.test(`${task.lumaLine || ""} ${task.displayPrompt || ""} ${task.spokenPrompt || ""}`);
+  }).length;
+  if (cloudHarborSayPromptCount > 1) {
+    errors.push("Cloud Harbor must not use 'Say:' as the dominant prompt pattern");
+  }
+  const requiredStoryBeats = [
+    "luma-introduction",
+    "sleepy-lantern",
+    "choose-wind-colour",
+    "flag-cloud-clue",
+    "find-silver-key",
+    "mix-breeze-potion",
+    "open-cloud-gate",
+    "build-first-bridge"
+  ];
+  if (JSON.stringify(playableCloudHarbor.tasks.map((task) => task.storyBeat)) !== JSON.stringify(requiredStoryBeats)) {
+    errors.push("Cloud Harbor story beats must match the gameplay-director mini story");
+  }
+  const flagClueTask = playableCloudHarbor.tasks.find((task) => task.id === "read-flag-clue");
+  if (!flagClueTask?.acceptedMeanings?.some((meaning) => /cloud/i.test(String(meaning)))) {
+    errors.push("Cloud Harbor flag clue must accept cloud/cloud-puff observations");
+  }
+  const chooseWindTask = playableCloudHarbor.tasks.find((task) => task.id === "choose-blue-wind");
+  if (!Array.isArray(chooseWindTask?.redirectMeanings) || !chooseWindTask.redirectMeanings.some((meaning) => /red|yellow/i.test(JSON.stringify(meaning)))) {
+    errors.push("Cloud Harbor blue-wind choice must gently redirect red/yellow answers");
   }
   const wakeTask = playableCloudHarbor.tasks.find((task) => task.id === "wake-the-dock");
   if (!wakeTask?.targetWords?.includes("eli") || !wakeTask?.targetWords?.includes("ellie")) {
@@ -918,6 +951,21 @@ for (const requiredSnippet of ["FloatingClouds", "BridgeSegment", "CloudHarborSc
   if (!skyCanvasSource.includes(requiredSnippet)) {
     errors.push(`Sky Islands 3D scene missing interactive/dynamic system: ${requiredSnippet}`);
   }
+}
+
+for (const requiredSnippet of ["cloud-harbor-harbor-shimmer", "cloud-harbor-blue-symbol", "cloud-harbor-wind-choice", "cloud-harbor-cloud-puff-choice", "cloud-harbor-drop-choice", "cloud-harbor-support-hotspot"]) {
+  if (!skyCanvasSource.includes(requiredSnippet)) {
+    errors.push(`Cloud Harbor director overlay missing code-driven beat feedback: ${requiredSnippet}`);
+  }
+}
+
+const voiceInterfaceSource = fs.readFileSync(path.join(rootDir, "src", "v2", "VoiceInterface.jsx"), "utf8");
+if (/localStorage|sessionStorage|saveRemoteSaga|saveProgress/.test(voiceInterfaceSource)) {
+  errors.push("VoiceInterface must not persist transcripts or audio");
+}
+const voicePersistenceScanSource = [voiceInterfaceSource, sagaAppSource, voiceGuideSource].join("\n");
+if (/completedTaskIdsByLevel.*transcript|transcript.*completedTaskIdsByLevel|collectedRewards.*transcript/i.test(voicePersistenceScanSource)) {
+  errors.push("V2 runtime must not write transcripts into saga progress");
 }
 
 if (!fs.existsSync(path.join(rootDir, "public", "assets", "v2", "ATTRIBUTIONS.md"))) {
