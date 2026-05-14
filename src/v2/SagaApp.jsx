@@ -177,6 +177,16 @@ function VoiceDebugPanel({ activeTaskId, voiceActivity }) {
       <span>worker websocket: {diagnostics.geminiWorkerWebSocketAvailable === null ? "unknown" : diagnostics.geminiWorkerWebSocketAvailable ? "available" : "unavailable"}</span>
       <span>gemini key: {diagnostics.geminiKeyConfigured === null ? "unknown" : diagnostics.geminiKeyConfigured ? "configured" : "missing"}</span>
       <span>gemini chunks: {diagnostics.lastGeminiAudioChunks || 0}</span>
+      <span>prompt playback: {diagnostics.promptPlaybackId || "none"}</span>
+      <span>active gemini sessions: {diagnostics.activeGeminiSessions || 0}</span>
+      <span>received chunks: {diagnostics.receivedGeminiChunks || 0}</span>
+      <span>scheduled chunks: {diagnostics.scheduledGeminiChunks || 0}</span>
+      <span>skipped duplicate chunks: {diagnostics.skippedDuplicateChunks || 0}</span>
+      <span>stale chunks ignored: {diagnostics.staleChunksIgnored || 0}</span>
+      <span>scheduled audio: {diagnostics.scheduledAudioSeconds || 0}s</span>
+      <span>audio queue depth: {diagnostics.audioQueueDepth || 0}</span>
+      <span>audio context rate: {diagnostics.audioContextSampleRate || "unknown"}</span>
+      <span>gemini sample rate: {diagnostics.geminiSampleRate || "unknown"}</span>
       <span>audio: {diagnostics.audioContextUnlocked ? "unlocked" : "unknown"}</span>
     </aside>
   );
@@ -539,6 +549,7 @@ function SagaApp({ initialProgress, debugMode = false, onProgressChange, onExit,
       setCaption(compatibilityNote ? `${QUIET_VOICE_MESSAGE} ${compatibilityNote}` : QUIET_VOICE_MESSAGE);
       await new Promise((resolve) => window.setTimeout(resolve, 850));
     }
+    mapVoiceGuide.stopSession("world-intro-complete");
     setIntroStage("flying");
     await new Promise((resolve) => window.setTimeout(resolve, 950));
     const nextSaga = markWorldIntroSeen(progress.saga, selectedWorldId);

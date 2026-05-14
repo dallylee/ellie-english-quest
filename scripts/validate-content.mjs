@@ -776,13 +776,19 @@ for (const requiredSnippet of ["extractAudioChunksFromValue", "inlineData", "aud
   }
 }
 
+for (const requiredSnippet of ["promptPlaybackId", "startPrompt", "waitForPrompt", "nextStartTime", "source.start(startAt)", "seenChunkKeys", "skippedDuplicateChunks", "staleChunksIgnored", "scheduledAudioSeconds"]) {
+  if (!voiceGuideSource.includes(requiredSnippet)) {
+    errors.push(`Voice guide missing Gemini sequential playback/duplicate guard piece: ${requiredSnippet}`);
+  }
+}
+
 for (const requiredSnippet of ["QUIET_VOICE_MESSAGE", "activeListeningLock", "recognitionStartCount", "lastRecognitionStopReason", "permissionRequestAttempted", "speechRecognitionInvoked", "quietFallbackUsed"]) {
   if (!voiceGuideSource.includes(requiredSnippet)) {
     errors.push(`Voice guide missing hotfix diagnostic/quiet-mode piece: ${requiredSnippet}`);
   }
 }
 
-for (const debugLabel of ["speech synthesis:", "voice mode:", "gemini status:", "worker:", "worker websocket:", "gemini key:", "gemini chunks:", "browser tts fallback:", "quiet fallback:", "last tts error:", "last stt error:"]) {
+for (const debugLabel of ["speech synthesis:", "voice mode:", "gemini status:", "worker:", "worker websocket:", "gemini key:", "gemini chunks:", "browser tts fallback:", "quiet fallback:", "last tts error:", "last stt error:", "prompt playback:", "active gemini sessions:", "received chunks:", "scheduled chunks:", "skipped duplicate chunks:", "stale chunks ignored:", "scheduled audio:", "audio queue depth:", "audio context rate:", "gemini sample rate:"]) {
   if (!sagaAppSource.includes(debugLabel)) {
     errors.push(`debugVoice panel missing ${debugLabel}`);
   }

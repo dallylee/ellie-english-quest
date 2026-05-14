@@ -36,16 +36,32 @@ const voiceDebugState = {
   geminiKeyConfigured: null,
   lastGeminiError: null,
   voiceMode: "none",
+  promptPlaybackId: null,
+  activeGeminiSessions: 0,
   lastGeminiAudioChunks: 0,
+  receivedGeminiChunks: 0,
+  scheduledGeminiChunks: 0,
+  skippedDuplicateChunks: 0,
+  staleChunksIgnored: 0,
+  scheduledAudioSeconds: 0,
+  audioQueueDepth: 0,
+  audioContextSampleRate: null,
+  geminiSampleRate: null,
   browserTtsFallbackUsed: false,
   quietFallbackUsed: false,
   lastPrimeReason: null
 };
 
 let activeListen = null;
+let activeGeminiSessionCount = 0;
 
 function updateVoiceDebug(patch) {
   Object.assign(voiceDebugState, patch);
+}
+
+function adjustActiveGeminiSessions(delta) {
+  activeGeminiSessionCount = Math.max(0, activeGeminiSessionCount + delta);
+  updateVoiceDebug({ activeGeminiSessions: activeGeminiSessionCount });
 }
 
 function isVoiceDebugEnabled() {
@@ -371,14 +387,48 @@ function pcm16BytesToFloat32(bytes) {
 
 function createLiveAudioPlayer() {
   let context = null;
+  let outputGain = null;
   let nextStartTime = 0;
-  const activeSources = new Set();
+  let activePromptId = null;
+  let scheduledAudioSeconds = 0;
+  let scheduledChunks = 0;
+  let lastGeminiSampleRate = null;
+  const activeSources = new Map();
+  const waiters = new Set();
 
   function getContext() {
     const AudioContext = window.AudioContext || window.webkitAudioContext;
     if (!AudioContext) return null;
-    if (!context) context = new AudioContext();
+    if (!context) {
+      context = new AudioContext();
+      outputGain = context.createGain();
+      outputGain.gain.value = 0.92;
+      outputGain.connect(context.destination);
+    }
     return context;
+  }
+
+  function sourceCountForPrompt(promptId) {
+    let count = 0;
+    for (const sourcePromptId of activeSources.values()) {
+      if (sourcePromptId === promptId) count += 1;
+    }
+    return count;
+  }
+
+  function updateQueueDebug() {
+    const ctx = context;
+    updateVoiceDebug({
+      scheduledGeminiChunks: scheduledChunks,
+      scheduledAudioSeconds: Number(scheduledAudioSeconds.toFixed(2)),
+      audioQueueDepth: activePromptId ? sourceCountForPrompt(activePromptId) : 0,
+      audioContextSampleRate: ctx?.sampleRate || null,
+      geminiSampleRate: lastGeminiSampleRate
+    });
+  }
+
+  function notifyWaiters() {
+    for (const waiter of Array.from(waiters)) waiter();
   }
 
   return {
@@ -386,33 +436,91 @@ function createLiveAudioPlayer() {
       const ctx = getContext();
       if (!ctx) return false;
       if (ctx.state !== "running") await ctx.resume();
-      nextStartTime = Math.max(nextStartTime, ctx.currentTime + 0.04);
+      nextStartTime = Math.max(nextStartTime, ctx.currentTime + 0.05);
+      updateQueueDebug();
       return true;
     },
 
-    enqueuePcm(base64, mimeType) {
+    startPrompt(promptId) {
+      this.stop("new-gemini-prompt");
+      activePromptId = promptId;
+      scheduledAudioSeconds = 0;
+      scheduledChunks = 0;
+      lastGeminiSampleRate = null;
       const ctx = getContext();
-      if (!ctx) return false;
+      nextStartTime = ctx ? ctx.currentTime + 0.05 : 0;
+      updateQueueDebug();
+    },
+
+    enqueuePcm(base64, mimeType, promptId) {
+      const ctx = getContext();
+      if (!ctx) return { scheduled: false, stale: false, reason: "audio-context-unavailable" };
+      if (!promptId || promptId !== activePromptId) {
+        return { scheduled: false, stale: true, reason: "stale-prompt" };
+      }
       const bytes = base64ToBytes(base64);
-      if (!bytes.length) return false;
+      if (!bytes.length) return { scheduled: false, stale: false, reason: "empty-audio" };
       const sampleRate = parseSampleRate(mimeType);
       const samples = pcm16BytesToFloat32(bytes);
-      if (!samples.length) return false;
+      if (!samples.length) return { scheduled: false, stale: false, reason: "empty-pcm" };
       const buffer = ctx.createBuffer(1, samples.length, sampleRate);
       buffer.copyToChannel(samples, 0);
       const source = ctx.createBufferSource();
       source.buffer = buffer;
-      source.connect(ctx.destination);
-      const startAt = Math.max(nextStartTime, ctx.currentTime + 0.025);
+      source.connect(outputGain);
+      const safetyOffset = scheduledChunks === 0 ? 0.06 : 0.015;
+      const startAt = Math.max(nextStartTime, ctx.currentTime + safetyOffset);
       source.start(startAt);
       nextStartTime = startAt + buffer.duration;
-      activeSources.add(source);
-      source.onended = () => activeSources.delete(source);
-      return true;
+      scheduledChunks += 1;
+      scheduledAudioSeconds += buffer.duration;
+      lastGeminiSampleRate = sampleRate;
+      activeSources.set(source, promptId);
+      source.onended = () => {
+        activeSources.delete(source);
+        updateQueueDebug();
+        notifyWaiters();
+      };
+      updateQueueDebug();
+      return {
+        scheduled: true,
+        sampleRate,
+        audioContextSampleRate: ctx.sampleRate,
+        duration: buffer.duration,
+        startAt,
+        queueDepth: sourceCountForPrompt(promptId)
+      };
+    },
+
+    waitForPrompt(promptId, maxMs = 16000) {
+      const ctx = getContext();
+      if (!ctx || !promptId) return Promise.resolve();
+      return new Promise((resolve) => {
+        let done = false;
+        const finish = () => {
+          if (done) return;
+          done = true;
+          waiters.delete(check);
+          window.clearTimeout(timeout);
+          updateQueueDebug();
+          resolve();
+        };
+        const check = () => {
+          if (promptId !== activePromptId) {
+            finish();
+            return;
+          }
+          const remaining = Math.max(0, nextStartTime - ctx.currentTime);
+          if (sourceCountForPrompt(promptId) === 0 && remaining <= 0.04) finish();
+        };
+        const timeout = window.setTimeout(finish, maxMs);
+        waiters.add(check);
+        check();
+      });
     },
 
     stop() {
-      for (const source of activeSources) {
+      for (const source of activeSources.keys()) {
         try {
           source.stop();
         } catch {
@@ -420,44 +528,70 @@ function createLiveAudioPlayer() {
         }
       }
       activeSources.clear();
+      activePromptId = null;
       if (context) nextStartTime = context.currentTime;
+      updateQueueDebug();
+      notifyWaiters();
     }
   };
 }
 
-function maybePushAudioChunk(chunks, data, mimeType) {
-  if (!data || typeof data !== "string") return;
-  chunks.push({
-    data,
-    mimeType: mimeType || "audio/pcm;rate=24000"
-  });
+function audioChunkKey(data, mimeType) {
+  const clean = stripDataUrlPrefix(data);
+  return `${mimeType || ""}:${clean.length}:${clean.slice(0, 40)}:${clean.slice(-40)}`;
 }
 
-function extractAudioChunksFromValue(value, chunks = []) {
+function maybePushAudioChunk(chunks, data, mimeType, state) {
+  if (!data || typeof data !== "string") return false;
+  const resolvedMimeType = mimeType || "audio/pcm;rate=24000";
+  const key = audioChunkKey(data, resolvedMimeType);
+  if (state.seenChunkKeys.has(key)) {
+    state.duplicateCount += 1;
+    return false;
+  }
+  state.seenChunkKeys.add(key);
+  chunks.push({
+    data,
+    mimeType: resolvedMimeType
+  });
+  return true;
+}
+
+function createExtractionState() {
+  return {
+    seenObjects: new WeakSet(),
+    seenChunkKeys: new Set(),
+    duplicateCount: 0
+  };
+}
+
+function extractAudioChunksFromValue(value, chunks = [], state = createExtractionState()) {
   if (!value || typeof value !== "object") return chunks;
+  if (state.seenObjects.has(value)) return chunks;
+  state.seenObjects.add(value);
 
   if (typeof value.audio === "string") {
-    maybePushAudioChunk(chunks, value.audio, value.mimeType || value.mime_type || value.audioMimeType);
+    maybePushAudioChunk(chunks, value.audio, value.mimeType || value.mime_type || value.audioMimeType, state);
   }
 
   if (typeof value.audioContent === "string") {
-    maybePushAudioChunk(chunks, value.audioContent, value.mimeType || value.audioMimeType);
+    maybePushAudioChunk(chunks, value.audioContent, value.mimeType || value.audioMimeType, state);
   }
 
   const inlineData = value.inlineData || value.inline_data;
   if (inlineData?.data && /^audio\//i.test(inlineData.mimeType || inlineData.mime_type || "")) {
-    maybePushAudioChunk(chunks, inlineData.data, inlineData.mimeType || inlineData.mime_type);
+    maybePushAudioChunk(chunks, inlineData.data, inlineData.mimeType || inlineData.mime_type, state);
   }
 
   if (typeof value.data === "string" && /^audio\//i.test(value.mimeType || value.mime_type || "")) {
-    maybePushAudioChunk(chunks, value.data, value.mimeType || value.mime_type);
+    maybePushAudioChunk(chunks, value.data, value.mimeType || value.mime_type, state);
   }
 
   for (const child of Object.values(value)) {
     if (Array.isArray(child)) {
-      for (const item of child) extractAudioChunksFromValue(item, chunks);
+      for (const item of child) extractAudioChunksFromValue(item, chunks, state);
     } else if (child && typeof child === "object") {
-      extractAudioChunksFromValue(child, chunks);
+      extractAudioChunksFromValue(child, chunks, state);
     }
   }
 
@@ -488,7 +622,14 @@ export function createVoiceGuide({ voiceEnabled = true } = {}) {
   let activeTask = null;
   let activeRecentEvent = null;
   let activeMood = "happy";
+  let promptPlaybackSequence = 0;
+  let activePromptPlaybackId = null;
+  let turnPromptPlaybackId = null;
   let audioChunkCount = 0;
+  let receivedChunkCount = 0;
+  let skippedDuplicateChunkCount = 0;
+  let staleChunkCount = 0;
+  let socketSessionCounted = false;
   const liveAudio = createLiveAudioPlayer();
 
   function cleanupSocket() {
@@ -500,6 +641,10 @@ export function createVoiceGuide({ voiceEnabled = true } = {}) {
     setupRejecter = null;
     turnResolver = null;
     turnRejecter = null;
+    if (socketSessionCounted) {
+      adjustActiveGeminiSessions(-1);
+      socketSessionCounted = false;
+    }
     if (socket) {
       socket.onopen = null;
       socket.onmessage = null;
@@ -518,15 +663,21 @@ export function createVoiceGuide({ voiceEnabled = true } = {}) {
     turnRejecter = null;
   }
 
-  function resolveTurnIfReady(message) {
+  async function resolveTurnIfReady(message, promptPlaybackId) {
     if (!message.serverContent) return;
     if (!message.serverContent.turnComplete && !message.serverContent.generationComplete) return;
     window.clearTimeout(turnTimer);
     turnTimer = null;
+    if (promptPlaybackId === activePromptPlaybackId) {
+      await liveAudio.waitForPrompt(promptPlaybackId);
+    }
     turnResolver?.({
       provider: "gemini-live",
       spoken: audioChunkCount > 0,
-      audioChunkCount
+      audioChunkCount,
+      receivedChunkCount,
+      skippedDuplicateChunkCount,
+      staleChunkCount
     });
     turnResolver = null;
     turnRejecter = null;
@@ -549,17 +700,42 @@ export function createVoiceGuide({ voiceEnabled = true } = {}) {
 
       if (message.serverContent?.interrupted) {
         liveAudio.stop();
+        turnPromptPlaybackId = null;
       }
 
+      const promptPlaybackId = activePromptPlaybackId;
       const audioSource = message.serverContent?.modelTurn || message.serverContent || message;
-      const audioChunks = extractAudioChunksFromValue(audioSource);
+      const extractionState = createExtractionState();
+      const audioChunks = extractAudioChunksFromValue(audioSource, [], extractionState);
+      const duplicateCount = extractionState.duplicateCount;
+      receivedChunkCount += audioChunks.length + duplicateCount;
+      skippedDuplicateChunkCount += duplicateCount;
+      if (!promptPlaybackId || promptPlaybackId !== turnPromptPlaybackId) {
+        staleChunkCount += audioChunks.length;
+        updateVoiceDebug({
+          receivedGeminiChunks: receivedChunkCount,
+          skippedDuplicateChunks: skippedDuplicateChunkCount,
+          staleChunksIgnored: staleChunkCount
+        });
+        await resolveTurnIfReady(message, promptPlaybackId);
+        return;
+      }
       for (const chunk of audioChunks) {
-        if (liveAudio.enqueuePcm(chunk.data, chunk.mimeType)) {
+        const result = liveAudio.enqueuePcm(chunk.data, chunk.mimeType, promptPlaybackId);
+        if (result.scheduled) {
           audioChunkCount += 1;
-          updateVoiceDebug({ lastGeminiAudioChunks: audioChunkCount });
+        } else if (result.stale) {
+          staleChunkCount += 1;
         }
       }
-      resolveTurnIfReady(message);
+      updateVoiceDebug({
+        lastGeminiAudioChunks: audioChunkCount,
+        receivedGeminiChunks: receivedChunkCount,
+        scheduledGeminiChunks: audioChunkCount,
+        skippedDuplicateChunks: skippedDuplicateChunkCount,
+        staleChunksIgnored: staleChunkCount
+      });
+      await resolveTurnIfReady(message, promptPlaybackId);
     } catch (error) {
       rejectPending(error);
     }
@@ -575,20 +751,25 @@ export function createVoiceGuide({ voiceEnabled = true } = {}) {
     });
   }
 
-  function waitForTurn() {
+  function waitForTurn(promptPlaybackId) {
     return new Promise((resolve, reject) => {
       turnResolver = resolve;
       turnRejecter = reject;
       turnTimer = window.setTimeout(() => {
         if (audioChunkCount > 0) {
-          resolve({
-            provider: "gemini-live",
-            spoken: true,
-            audioChunkCount,
-            timedOutAfterAudio: true
+          liveAudio.waitForPrompt(promptPlaybackId).then(() => {
+            resolve({
+              provider: "gemini-live",
+              spoken: true,
+              audioChunkCount,
+              receivedChunkCount,
+              skippedDuplicateChunkCount,
+              staleChunkCount,
+              timedOutAfterAudio: true
+            });
+            turnResolver = null;
+            turnRejecter = null;
           });
-          turnResolver = null;
-          turnRejecter = null;
           return;
         }
         reject(new Error("Gemini Live audio timed out"));
@@ -634,6 +815,10 @@ export function createVoiceGuide({ voiceEnabled = true } = {}) {
       rejectPending(new Error("Gemini Live socket error"));
     };
     socket.onclose = (event) => {
+      if (socketSessionCounted) {
+        adjustActiveGeminiSessions(-1);
+        socketSessionCounted = false;
+      }
       if (event.code !== 1000) {
         const message = sanitizeDiagnosticError(`Gemini Live socket closed: ${event.code} ${event.reason || ""}`);
         updateVoiceDebug({ geminiStatus: "failed", geminiConnected: false, lastGeminiError: message });
@@ -643,6 +828,10 @@ export function createVoiceGuide({ voiceEnabled = true } = {}) {
 
     const setupPromise = waitForSetup();
     socket.onopen = () => {
+      if (!socketSessionCounted) {
+        adjustActiveGeminiSessions(1);
+        socketSessionCounted = true;
+      }
       updateVoiceDebug({ geminiStatus: "connecting", geminiWorkerStatus: "websocket-open" });
       socket.send(JSON.stringify(buildLiveSetup({ mood: activeMood })));
     };
@@ -727,8 +916,14 @@ export function createVoiceGuide({ voiceEnabled = true } = {}) {
       stopActiveRecognition(reason);
       cleanupSocket();
       liveAudio.stop();
+      activePromptPlaybackId = null;
+      turnPromptPlaybackId = null;
       session = null;
       stopSpeaking();
+      updateVoiceDebug({
+        promptPlaybackId: null,
+        voiceMode: voiceDebugState.voiceMode === "gemini-audio" ? voiceDebugState.voiceMode : "none"
+      });
     },
 
     async playGuidePrompt(prompt, { mood = "happy" } = {}) {
@@ -741,9 +936,27 @@ export function createVoiceGuide({ voiceEnabled = true } = {}) {
 
       if (session?.provider === "gemini-live" && socket?.readyState === WebSocket.OPEN) {
         try {
+          const promptPlaybackId = `${Date.now()}-${promptPlaybackSequence + 1}`;
+          promptPlaybackSequence += 1;
+          activePromptPlaybackId = promptPlaybackId;
+          turnPromptPlaybackId = promptPlaybackId;
           audioChunkCount = 0;
-          updateVoiceDebug({ lastGeminiAudioChunks: 0 });
-          const turnPromise = waitForTurn();
+          receivedChunkCount = 0;
+          skippedDuplicateChunkCount = 0;
+          staleChunkCount = 0;
+          liveAudio.startPrompt(promptPlaybackId);
+          updateVoiceDebug({
+            promptPlaybackId,
+            lastGeminiAudioChunks: 0,
+            receivedGeminiChunks: 0,
+            scheduledGeminiChunks: 0,
+            skippedDuplicateChunks: 0,
+            staleChunksIgnored: 0,
+            scheduledAudioSeconds: 0,
+            audioQueueDepth: 0,
+            voiceMode: "none"
+          });
+          const turnPromise = waitForTurn(promptPlaybackId);
           socket.send(JSON.stringify(buildClientContent({
             prompt,
             mood,
@@ -762,16 +975,50 @@ export function createVoiceGuide({ voiceEnabled = true } = {}) {
               geminiStatus: "connected",
               voiceMode: "gemini-audio",
               lastGeminiAudioChunks: liveResult.audioChunkCount || audioChunkCount,
+              receivedGeminiChunks: liveResult.receivedChunkCount || receivedChunkCount,
+              scheduledGeminiChunks: liveResult.audioChunkCount || audioChunkCount,
+              skippedDuplicateChunks: liveResult.skippedDuplicateChunkCount ?? skippedDuplicateChunkCount,
+              staleChunksIgnored: liveResult.staleChunkCount ?? staleChunkCount,
               browserTtsFallbackUsed: false,
               quietFallbackUsed: false
             });
+            turnPromptPlaybackId = null;
             return liveResult;
           }
           throw new Error("Gemini Live returned no audio");
         } catch (error) {
+          const failedPromptPlaybackId = activePromptPlaybackId;
           cleanupSocket();
-          liveAudio.stop();
           const safeError = sanitizeDiagnosticError(error?.message || "Gemini Live playback failed");
+          if (audioChunkCount > 0) {
+            await liveAudio.waitForPrompt(failedPromptPlaybackId).catch(() => {});
+            updateVoiceDebug({
+              geminiStatus: "connected",
+              voiceMode: "gemini-audio",
+              lastTtsProvider: "gemini-live",
+              lastTtsSpoken: true,
+              lastTtsError: safeError,
+              lastGeminiError: safeError,
+              lastGeminiAudioChunks: audioChunkCount,
+              receivedGeminiChunks: receivedChunkCount,
+              scheduledGeminiChunks: audioChunkCount,
+              skippedDuplicateChunks: skippedDuplicateChunkCount,
+              staleChunksIgnored: staleChunkCount,
+              browserTtsFallbackUsed: false,
+              quietFallbackUsed: false
+            });
+            turnPromptPlaybackId = null;
+            return {
+              provider: "gemini-live",
+              spoken: true,
+              audioChunkCount,
+              partial: true,
+              error: safeError
+            };
+          }
+          liveAudio.stop();
+          activePromptPlaybackId = null;
+          turnPromptPlaybackId = null;
           session = { provider: "browser-fallback", reason: safeError };
           updateVoiceDebug({
             geminiStatus: "failed",
@@ -779,7 +1026,8 @@ export function createVoiceGuide({ voiceEnabled = true } = {}) {
             lastTtsProvider: "gemini-live",
             lastTtsSpoken: false,
             lastTtsError: safeError,
-            lastGeminiError: safeError
+            lastGeminiError: safeError,
+            voiceMode: "failed"
           });
         }
       }
